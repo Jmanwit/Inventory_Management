@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#214536">
+  <meta name="description" content="Know what you own. Know where it is.">
+  <title>Shack Out Back</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">SOB</div>
+    <div class="brand-copy">
+      <p class="eyebrow">HOUSEHOLD INVENTORY</p>
+      <h1>Shack Out Back</h1>
+    </div>
+    <button id="menu-export" class="button button-quiet" type="button">Export</button>
+  </header>
+
+  <main class="app-shell">
+    <section class="intro-panel">
+      <p class="eyebrow">THE HOUSEHOLD LEDGER</p>
+      <h2>Know what you own.<br><em>Know where it is.</em></h2>
+      <p class="muted">A dependable record of every box, its contents, and where it lives now.</p>
+    </section>
+
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab active" data-view="inventory" type="button">Inventory</button>
+      <button class="tab" data-view="create" type="button">New Box</button>
+      <button class="tab" data-view="rooms" type="button">Rooms & Locations</button>
+    </nav>
+
+    <section id="view-inventory" class="view active" aria-labelledby="inventory-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">YOUR RECORDS</p>
+          <h2 id="inventory-title">Inventory</h2>
+        </div>
+        <button class="button button-primary" data-action="new-box" type="button">+ New Box</button>
+      </div>
+      <label class="search-field">
+        <span class="visually-hidden">Search inventory</span>
+        <span aria-hidden="true">⌕</span>
+        <input id="search-input" type="search" placeholder="Find an item, box, room, or location…" autocomplete="off">
+      </label>
+      <div id="sync-status" class="status-banner" role="status">Local prototype · this device only</div>
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="list-heading">
+        <h3>Boxes</h3>
+        <span id="result-count" class="muted small">0 boxes</span>
+      </div>
+      <div id="box-list" class="box-list"></div>
+      <div id="empty-state" class="empty-state">
+        <div class="empty-ornament" aria-hidden="true">✦</div>
+        <h3>Your ledger starts here.</h3>
+        <p>Create your first box, record what's inside, and assign where it is right now.</p>
+        <button class="button button-primary" data-action="new-box" type="button">Create First Box</button>
+      </div>
+    </section>
+
+    <section id="view-create" class="view" aria-labelledby="form-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">ADD TO THE LEDGER</p>
+          <h2 id="form-title">Create a box</h2>
+        </div>
+      </div>
+      <form id="box-form" class="form-card">
+        <input id="box-internal-id" type="hidden">
+        <div class="form-section">
+          <h3>Box identity</h3>
+          <label>Destination room <span class="required">*</span>
+            <select id="box-room" required></select>
+          </label>
+          <label>Short description <span class="required">*</span>
+            <input id="box-description" maxlength="70" required placeholder="Pots and Pans">
+          </label>
+          <label>Current physical location <span class="required">*</span>
+            <select id="box-location" required></select>
+          </label>
+          <label>Packing status
+            <select id="box-status">
+              <option value="Packed">Packed</option>
+              <option value="In progress">In progress</option>
+              <option value="Unpacked">Unpacked</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-section">
+          <div class="section-heading compact">
+            <h3>Individual contents</h3>
+            <span class="muted small">One item per line</span>
+          </div>
+          <label>What's inside?
+            <textarea id="box-items" rows="5" placeholder="Lodge Cast Iron Pan&#10;Dutch Oven&#10;Stainless Steel Stockpot"></textarea>
+          </label>
+          <p class="help-text">Each line becomes a separate searchable item.</p>
+        </div>
+        <div class="form-section">
+          <h3>Notes & handling</h3>
+          <label>Notes
+            <textarea id="box-notes" rows="3" placeholder="Heavy. Keep upright."></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button id="cancel-edit" class="button button-secondary hidden" type="button">Cancel</button>
+          <button class="button button-primary" type="submit">Save Box</button>
+        </div>
+        <p id="form-error" class="error-message" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="view-rooms" class="view" aria-labelledby="rooms-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">YOUR PLACES</p>
+          <h2 id="rooms-title">Rooms & locations</h2>
+        </div>
+      </div>
+      <div class="two-column">
+        <div class="form-card">
+          <h3>Rooms</h3>
+          <p class="muted small">A room is a box's destination. Each room has its own ID prefix.</p>
+          <div id="room-list" class="settings-list"></div>
+          <form id="room-form" class="inline-form">
+            <label>New room name<input id="new-room-name" required placeholder="Workshop"></label>
+            <label>Box ID prefix<input id="new-room-prefix" required maxlength="5" placeholder="WRK"></label>
+            <button class="button button-primary" type="submit">Add Room</button>
+            <p id="room-error" class="error-message" role="alert"></p>
+          </form>
+        </div>
+        <div class="form-card">
+          <h3>Physical locations</h3>
+          <p class="muted small">A location is where a box physically is right now.</p>
+          <div id="location-list" class="settings-list"></div>
+          <form id="location-form" class="inline-form">
+            <label>New location<input id="new-location-name" required placeholder="Moving Truck"></label>
+            <button class="button button-primary" type="submit">Add Location</button>
+            <p id="location-error" class="error-message" role="alert"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="detail-dialog" class="detail-dialog">
+    <div id="detail-content"></div>
+  </dialog>
+
+  <dialog id="relocate-dialog" class="small-dialog">
+    <form id="relocate-form" method="dialog">
+      <p class="eyebrow">UPDATE PHYSICAL LOCATION</p>
+      <h2>Relocate box</h2>
+      <p id="relocate-box-label" class="muted"></p>
+      <label>New current location
+        <select id="relocate-location" required></select>
+      </label>
+      <label>Or add a new location
+        <input id="relocate-new-location" placeholder="Type a new location (optional)">
+      </label>
+      <div class="form-actions">
+        <button class="button button-secondary" value="cancel" type="button" data-close-dialog="relocate-dialog">Cancel</button>
+        <button class="button button-primary" type="submit">Confirm Relocation</button>
+      </div>
+      <p id="relocate-error" class="error-message" role="alert"></p>
+    </form>
+  </dialog>
+
+  <dialog id="label-dialog" class="label-dialog">
+    <div class="label-dialog-head">
+      <div>
+        <p class="eyebrow">LABEL COMPLETE</p>
+        <h2>Print box label</h2>
+      </div>
+      <button class="icon-button" data-close-dialog="label-dialog" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="label-preview-host"></div>
+    <label class="quantity-control">Number of copies
+      <div class="quantity-row">
+        <button id="quantity-minus" class="button button-secondary" type="button" aria-label="Decrease copies">−</button>
+        <output id="label-quantity">1</output>
+        <button id="quantity-plus" class="button button-secondary" type="button" aria-label="Increase copies">+</button>
+      </div>
+    </label>
+    <button id="print-labels" class="button button-primary full-width" type="button">PRINT 1 LABEL</button>
+    <p class="help-text">Printing currently uses the browser print dialog. Direct NIIMBOT B21S printing is not yet implemented.</p>
+  </dialog>
+
+  <dialog id="import-dialog" class="small-dialog">
+    <form id="import-form" method="dialog">
+      <p class="eyebrow">RESTORE DATA</p>
+      <h2>Import inventory</h2>
+      <p class="muted">This starter imports a JSON backup into the current local inventory. Export a backup first. Import/merge conflict handling is not production-ready yet.</p>
+      <label>Choose JSON backup<input id="import-file" type="file" accept="application/json,.json" required></label>
+      <div class="form-actions">
+        <button class="button button-secondary" type="button" data-close-dialog="import-dialog">Cancel</button>
+        <button class="button button-primary" type="submit">Import JSON</button>
+      </div>
+      <p id="import-error" class="error-message" role="alert"></p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer class="app-footer">
+    <span>Shack Out Back</span>
+    <span>Local prototype · v0.1</span>
+  </footer>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

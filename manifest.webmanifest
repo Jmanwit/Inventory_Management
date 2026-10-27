@@ -1,0 +1,11 @@
+{
+  "name": "Shack Out Back",
+  "short_name": "Shack Out Back",
+  "description": "Household inventory and moving-box tracking.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f0e5",
+  "theme_color": "#214536",
+  "icons": []
+}
