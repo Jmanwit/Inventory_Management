@@ -20,31 +20,6 @@
   </header>
 
   <main class="app-shell">
-    <section id="auth-panel" class="auth-panel form-card">
-      <p class="eyebrow">SHARED HOUSEHOLD LEDGER</p>
-      <h2>Connect your household</h2>
-      <p class="muted">Sign in to access the shared inventory. Your data is stored in your Supabase project, not just this browser.</p>
-      <form id="auth-form" class="inline-form">
-        <label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
-        <label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
-        <div class="form-actions"><button class="button button-primary" type="submit">Sign In</button><button id="auth-signup" class="button button-secondary" type="button">Create Account</button></div>
-        <p id="auth-error" class="error-message" role="alert"></p>
-        <p id="auth-message" class="help-text" role="status"></p>
-      </form>
-      <div id="household-setup" class="hidden">
-        <hr><h3>Create the shared household</h3><p class="muted small">Do this once, using the account that should own the inventory.</p>
-        <label>Household name<input id="household-name" value="Shack Out Back Household" maxlength="80"></label>
-        <button id="create-household" class="button button-primary" type="button">Create Household Inventory</button>
-      </div>
-      <div id="household-invite" class="hidden">
-        <hr><h3>Add your wife's account</h3><p class="muted small">She must create her own account first. Then enter the same email address she used to register.</p>
-        <label>Her registered email<input id="invite-email" type="email" placeholder="wife@example.com"></label>
-        <button id="invite-member" class="button button-secondary" type="button">Add Household Member</button>
-        <p id="invite-message" class="help-text" role="status"></p>
-      </div>
-      <div id="signed-in-tools" class="hidden"><hr><p id="signed-in-label" class="muted small"></p><button id="auth-signout" class="button button-secondary" type="button">Sign Out</button></div>
-    </section>
-    <div id="workspace" class="hidden">
     <section class="intro-panel">
       <p class="eyebrow">THE HOUSEHOLD LEDGER</p>
       <h2>Know what you own.<br><em>Know where it is.</em></h2>
@@ -55,7 +30,6 @@
       <button class="tab active" data-view="inventory" type="button">Inventory</button>
       <button class="tab" data-view="create" type="button">New Box</button>
       <button class="tab" data-view="rooms" type="button">Rooms & Locations</button>
-      <button class="tab" data-view="settings" type="button">Settings & Household</button>
     </nav>
 
     <section id="view-inventory" class="view active" aria-labelledby="inventory-title">
@@ -193,26 +167,6 @@
         </div>
       </div>
     </section>
-
-    <section id="view-settings" class="view" aria-labelledby="settings-title">
-      <div class="section-heading"><div><p class="eyebrow">HOUSEHOLD MANAGEMENT</p><h2 id="settings-title">Settings & Household</h2></div></div>
-      <div class="form-card settings-card">
-        <h3>Shared household ledger</h3>
-        <p class="muted small">This is the name your household members should look for. Everyone who belongs to this ledger sees the same boxes.</p>
-        <div class="ledger-identity"><span class="muted small">LEDGER NAME</span><strong id="settings-ledger-name">Loading…</strong><span class="muted small">LEDGER ID</span><code id="settings-ledger-id">—</code><button id="copy-ledger-details" class="button button-secondary" type="button">Copy ledger details</button></div>
-        <hr>
-        <h3>Your account</h3><p id="settings-account-email" class="account-email">—</p>
-        <button id="settings-signout" class="button button-secondary" type="button">Sign Out</button>
-        <hr>
-        <h3>Add a household member</h3>
-        <p class="muted small">Your wife should first create and verify her own Shack Out Back account, then sign in once. Enter the exact email she registered with below. This adds her to this existing ledger; she should not create a second household.</p>
-        <label>Household member's registered email<input id="settings-invite-email" type="email" placeholder="name@example.com" autocomplete="email"></label>
-        <button id="settings-invite-member" class="button button-primary" type="button">Add Member to This Ledger</button>
-        <p id="settings-invite-message" class="help-text" role="status"></p>
-        <p id="settings-error" class="error-message" role="alert"></p>
-      </div>
-    </section>
-    </div>
   </main>
 
   <dialog id="detail-dialog" class="detail-dialog">
@@ -262,7 +216,7 @@
     <form id="import-form" method="dialog">
       <p class="eyebrow">RESTORE DATA</p>
       <h2>Import inventory</h2>
-      <p class="muted">JSON export works for cloud inventory. Restoring a JSON backup into the shared database is intentionally disabled until the first two-account sync is tested, to avoid accidental duplicates or overwrites.</p>
+      <p class="muted">This starter imports a JSON backup into the current local inventory. Export a backup first. Import/merge conflict handling is not production-ready yet.</p>
       <label>Choose JSON backup<input id="import-file" type="file" accept="application/json,.json" required></label>
       <div class="form-actions">
         <button class="button button-secondary" type="button" data-close-dialog="import-dialog">Cancel</button>
@@ -275,7 +229,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <footer class="app-footer">
     <span>Shack Out Back</span>
-    <span id="footer-status">Shared inventory · beta</span>
+    <span>Local prototype · v0.1</span>
   </footer>
   <script type="module" src="./js/app.js"></script>
 </body>
