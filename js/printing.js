@@ -61,7 +61,8 @@ function makeLabel(box, preview = false) {
   handlingTitle.textContent = "HANDLING INSTRUCTIONS";
   const handlingText = document.createElement("div");
   handlingText.className = "label-handling-text";
-  handlingText.textContent = (box.notes || "").trim() || "NO SPECIAL HANDLING";
+  const handlingLines = [...new Set([...(box.handlingInstructions || []), ...(box.notes || "").split(/\r?\n/).map(v => v.trim()).filter(Boolean)])];
+  handlingText.textContent = handlingLines.join(" · ") || "NO SPECIAL HANDLING";
   handling.append(handlingTitle, handlingText);
   copy.append(id, room, desc, handling);
   paper.append(qr, copy);

@@ -4,7 +4,8 @@ import { setupPrinting } from "./printing.js";
 import { downloadJson, renderPrintableInventory, downloadBlob } from "./exports.js";
 
 const $ = id => document.getElementById(id);
-const state = { activeView: "inventory", detailBoxId: null, labelBoxId: null };
+const state = { activeView: "inventory", detailBoxId: null, labelBoxId: null, selectedHandling: [] };
+const STANDARD_HANDLING = ["Fragile", "Keep Upright", "Heavy", "Do Not Stack", "This Side Up", "Keep Dry", "Handle With Care", "Two-Person Lift", "Keep Accessible", "Sharp Objects", "Temperature Sensitive", "Do Not Crush"];
 store.init();
 
 const labelDialog = $("label-dialog");
@@ -28,14 +29,15 @@ function showView(name) {
   if (name === "create") resetForm();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function populateSelect(select, options, selectedId = "") {
+function populateSelect(select, options, selectedId = null) {
+  const previous = selectedId ?? select.value;
   select.replaceChildren();
   for (const item of options) {
     const option = document.createElement("option");
     option.value = item.id; option.textContent = item.name;
     select.append(option);
   }
-  if (selectedId) select.value = selectedId;
+  if (previous && options.some(item => item.id === previous)) select.value = previous;
 }
 function render() {
   const s = store.snapshot();
@@ -63,6 +65,38 @@ function render() {
   populateSelect($("box-room"), s.rooms.map(r => ({id:r.id,name:`${r.name} (${r.prefix})`})));
   populateSelect($("box-location"), s.locations);
   populateSelect($("relocate-location"), s.locations);
+  renderHandlingOptions(s);
+}
+function renderHandlingOptions(s) {
+  const host = $("handling-presets");
+  if (!host) return;
+  const all = [...new Set([...STANDARD_HANDLING, ...(s.customHandlingInstructions || [])])];
+  host.replaceChildren();
+  for (const instruction of all) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `handling-chip${state.selectedHandling.includes(instruction) ? " selected" : ""}`;
+    button.setAttribute("aria-pressed", String(state.selectedHandling.includes(instruction)));
+    button.textContent = instruction;
+    button.addEventListener("click", () => {
+      state.selectedHandling = state.selectedHandling.includes(instruction)
+        ? state.selectedHandling.filter(v => v !== instruction)
+        : [...state.selectedHandling, instruction];
+      renderHandlingOptions(store.snapshot());
+    });
+    host.append(button);
+  }
+  const selected = $("selected-handling");
+  selected.replaceChildren();
+  if (!state.selectedHandling.length) {
+    const empty = document.createElement("p"); empty.className = "muted small"; empty.textContent = "No quick instructions selected."; selected.append(empty); return;
+  }
+  for (const instruction of state.selectedHandling) {
+    const chip = document.createElement("button"); chip.type = "button"; chip.className = "selected-handling-chip";
+    chip.textContent = `× ${instruction}`; chip.setAttribute("aria-label", `Remove ${instruction}`);
+    chip.addEventListener("click", () => { state.selectedHandling = state.selectedHandling.filter(v => v !== instruction); renderHandlingOptions(store.snapshot()); });
+    selected.append(chip);
+  }
 }
 function renderRoomsAndLocations(s) {
   $("room-list").replaceChildren();
@@ -80,7 +114,7 @@ function renderRoomsAndLocations(s) {
   }
 }
 function resetForm() {
-  $("box-form").reset(); $("box-internal-id").value = "";
+  $("box-form").reset(); $("box-internal-id").value = ""; state.selectedHandling = [];
   $("form-title").textContent = "Create a box"; $("cancel-edit").classList.add("hidden");
   $("form-error").textContent = "";
   const s = store.snapshot();
@@ -97,6 +131,8 @@ function editBox(box) {
   $("box-status").value = box.status || "Packed";
   $("box-items").value = (box.items || []).join("\n");
   $("box-notes").value = box.notes || "";
+  state.selectedHandling = Array.isArray(box.handlingInstructions) ? [...box.handlingInstructions] : [];
+  renderHandlingOptions(store.snapshot());
   $("cancel-edit").classList.remove("hidden");
 }
 function openDetail(id) {
@@ -113,7 +149,7 @@ function openDetail(id) {
         <div class="meta-card"><span>LAST UPDATED</span><strong>${new Date(box.updatedAt).toLocaleString()}</strong></div>
       </div>
       <div class="detail-section"><h3>Contents (${box.items.length})</h3>${box.items.length ? `<ul class="item-list">${box.items.map(i=>`<li>${escapeHtml(i)}</li>`).join("")}</ul>` : '<p class="muted">No individual contents recorded.</p>'}</div>
-      <div class="detail-section"><h3>Notes & handling</h3><p>${escapeHtml(box.notes || "No notes.")}</p></div>
+      <div class="detail-section"><h3>Handling instructions</h3>${(box.handlingInstructions || []).length ? `<p class="detail-handling-tags">${box.handlingInstructions.map(i=>`<span>${escapeHtml(i)}</span>`).join("")}</p>` : ""}<p>${escapeHtml(box.notes || "No additional notes.")}</p></div>
       <div class="detail-actions">
         <button class="button button-primary" data-relocate="${escapeHtml(box.id)}" type="button">Relocate Box</button>
         <button class="button button-secondary" data-reprint="${escapeHtml(box.id)}" type="button">Reprint Label</button>
@@ -164,7 +200,8 @@ $("box-form").addEventListener("submit", event => {
       roomId: $("box-room").value, locationId: $("box-location").value,
       description: $("box-description").value,
       items: $("box-items").value.split(/\r?\n/),
-      notes: $("box-notes").value, status: $("box-status").value
+      notes: $("box-notes").value, status: $("box-status").value,
+      handlingInstructions: [...state.selectedHandling]
     };
     const isNew = !input.id;
     const box = store.saveBox(input);
@@ -174,6 +211,43 @@ $("box-form").addEventListener("submit", event => {
   } catch (error) { setFieldError("form-error", error.message); }
 });
 $("cancel-edit").addEventListener("click", () => { resetForm(); showView("inventory"); });
+$("quick-add-room").addEventListener("click", () => {
+  setFieldError("quick-room-error", "");
+  try {
+    const name = $("quick-room-name").value;
+    const prefix = $("quick-room-prefix").value;
+    store.addRoom(name, prefix);
+    const room = store.rooms().find(r => r.name.toLowerCase() === name.trim().toLowerCase());
+    render(); if (room) $("box-room").value = room.id;
+    $("quick-room-name").value = ""; $("quick-room-prefix").value = "";
+    $("quick-room-name").closest("details").open = false;
+    toast(`Room ${room?.name || name} added and selected.`);
+  } catch (error) { setFieldError("quick-room-error", error.message); }
+});
+$("quick-add-location").addEventListener("click", () => {
+  setFieldError("quick-location-error", "");
+  try {
+    const name = $("quick-location-name").value;
+    const location = store.addLocation(name);
+    render(); $("box-location").value = location.id;
+    $("quick-location-name").value = "";
+    $("quick-location-name").closest("details").open = false;
+    toast(`Location ${location.name} added and selected.`);
+  } catch (error) { setFieldError("quick-location-error", error.message); }
+});
+$("add-custom-instruction").addEventListener("click", () => {
+  setFieldError("handling-error", "");
+  const value = $("custom-instruction-text").value.trim();
+  if (!value) { setFieldError("handling-error", "Type an instruction first."); return; }
+  try {
+    let instruction = value;
+    if ($("save-custom-instruction").checked) instruction = store.addHandlingInstruction(value);
+    if (!state.selectedHandling.some(v => v.toLowerCase() === instruction.toLowerCase())) state.selectedHandling.push(instruction);
+    $("custom-instruction-text").value = "";
+    renderHandlingOptions(store.snapshot());
+    toast($("save-custom-instruction").checked ? "Instruction saved for reuse and selected." : "One-off instruction selected.");
+  } catch (error) { setFieldError("handling-error", error.message); }
+});
 $("room-form").addEventListener("submit", event => {
   event.preventDefault(); setFieldError("room-error", "");
   try {
@@ -223,25 +297,24 @@ document.addEventListener("change", event => {
     if (room && !$("box-description").value) $("box-description").placeholder = `e.g. ${room.name} supplies`;
   }
 });
-function handleBoxHash() {
-  const match = location.hash.match(/(?:^#|[&#])box=([^&]+)/);
-  if (!match) return;
-  let id;
-  try { id = decodeURIComponent(match[1]); }
-  catch { toast("That QR code contains an invalid box reference."); return; }
-
-  const box = store.getBox(id);
-  if (box) openDetail(box.id);
-  else toast("This box is not in the local inventory on this device.");
-}
-
-// A QR link usually opens the page with its hash already present. In that case,
-// the browser does not fire hashchange after this module loads, so handle it once
-// after the initial inventory render as well as on subsequent hash changes.
-window.addEventListener("hashchange", handleBoxHash);
+window.addEventListener("hashchange", () => {
+  const match = location.hash.match(/box=([^&]+)/);
+  if (match) {
+    const id = decodeURIComponent(match[1]);
+    if (store.getBox(id)) openDetail(id);
+    else toast("This box is not in the local inventory on this device.");
+  }
+});
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service worker registration failed", err)));
 }
 store.subscribe(render);
 render();
-handleBoxHash();
+function handleBoxHash() {
+  const match = location.hash.match(/box=([^&]+)/);
+  if (!match) return;
+  const id = decodeURIComponent(match[1]);
+  if (store.getBox(id)) openDetail(id);
+  else toast("This box is not in the local inventory on this device.");
+}
+if (location.hash.includes("box=")) handleBoxHash();

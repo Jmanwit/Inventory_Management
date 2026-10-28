@@ -12,7 +12,8 @@ function initialState() {
     rooms: DEFAULT_ROOMS.map(r => ({ id: makeId(), name: r.name, prefix: r.prefix, createdAt: now() })),
     locations: DEFAULT_LOCATIONS.map(name => ({ id: makeId(), name, createdAt: now() })),
     boxes: [],
-    retiredBoxIds: []
+    retiredBoxIds: [],
+    customHandlingInstructions: []
   };
 }
 
@@ -30,7 +31,8 @@ function normalizeState(value) {
     rooms: value.rooms,
     locations: value.locations,
     boxes: value.boxes,
-    retiredBoxIds: Array.isArray(value.retiredBoxIds) ? value.retiredBoxIds : []
+    retiredBoxIds: Array.isArray(value.retiredBoxIds) ? value.retiredBoxIds : [],
+    customHandlingInstructions: Array.isArray(value.customHandlingInstructions) ? value.customHandlingInstructions : []
   };
 }
 
@@ -68,6 +70,17 @@ export const store = {
     s.rooms.push({ id: makeId(), name: cleanName, prefix: cleanPrefix, createdAt: now() });
     state = s; persist();
   },
+  addHandlingInstruction(name) {
+    const s = this.snapshot();
+    const clean = String(name || "").trim();
+    if (!clean) throw new Error("Enter an instruction.");
+    if (clean.length > 100) throw new Error("Instructions must be 100 characters or fewer.");
+    const existing = s.customHandlingInstructions.find(v => v.toLowerCase() === clean.toLowerCase());
+    if (existing) return existing;
+    s.customHandlingInstructions.push(clean);
+    state = s; persist();
+    return clean;
+  },
   addLocation(name) {
     const s = this.snapshot();
     const clean = name.trim();
@@ -96,6 +109,7 @@ export const store = {
       box.currentLocation = location.name;
       box.items = contents;
       box.notes = input.notes.trim();
+      box.handlingInstructions = Array.isArray(input.handlingInstructions) ? [...new Set(input.handlingInstructions.map(v => String(v).trim()).filter(Boolean))] : (box.handlingInstructions || []);
       box.status = input.status;
       box.updatedAt = now();
     } else {
@@ -108,8 +122,9 @@ export const store = {
         id: makeId(), boxId, qrToken: makeId(), roomId: room.id,
         destination: room.name, description: input.description.trim(),
         locationId: location.id, currentLocation: location.name,
-        items: contents, notes: input.notes.trim(), status: input.status || "Packed",
-        createdAt: now(), updatedAt: now()
+        items: contents, notes: input.notes.trim(),
+        handlingInstructions: Array.isArray(input.handlingInstructions) ? [...new Set(input.handlingInstructions.map(v => String(v).trim()).filter(Boolean))] : [],
+        status: input.status || "Packed", createdAt: now(), updatedAt: now()
       };
       s.boxes.push(box);
     }
@@ -148,7 +163,8 @@ export const store = {
       app: "Shack Out Back", schemaVersion: s.schemaVersion,
       inventoryId: s.inventoryId, exportedAt: now(),
       rooms: s.rooms, locations: s.locations, boxes: s.boxes,
-      retiredBoxIds: s.retiredBoxIds
+      retiredBoxIds: s.retiredBoxIds,
+      customHandlingInstructions: s.customHandlingInstructions || []
     };
   },
   importReplace(value) {
