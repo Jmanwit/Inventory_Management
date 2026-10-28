@@ -44,7 +44,25 @@ export const store = {
   async importReplace(){throw new Error("Cloud restore is not enabled in this first sync build. Keep your JSON backup safe; we'll add a guided importer after two-account sync is tested.");}
 };
 export async function signIn(email,password){const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;user=data.user;await refresh();return data.user;}
-export async function signUp(email,password){const {data,error}=await supabase.auth.signUp({email,password});if(error)throw error;if(data.user && data.session){user=data.user;await refresh();}return data;}
+export async function signUp(email, password) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo:
+        "https://jmanwit.github.io/Inventory_Management/"
+    }
+  });
+
+  if (error) throw error;
+
+  if (data.user && data.session) {
+    user = data.user;
+    await refresh();
+  }
+
+  return data;
+}
 export async function signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;user=null;await refresh();}
 export async function currentUser(){const {data,error}=await supabase.auth.getUser();if(error && error.name!=="AuthSessionMissingError")throw error;user=data?.user||null;return user;}
 export function authChanges(callback){return supabase.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;queueMicrotask(()=>callback(user));});}
