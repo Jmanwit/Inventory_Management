@@ -63,6 +63,12 @@ function render() {
     $("box-list").append(empty);
   }
   renderRoomsAndLocations(s);
+  const ledgerName = $("settings-ledger-name");
+  if (ledgerName) ledgerName.textContent = s.inventoryName || "Household Inventory";
+  const ledgerId = $("settings-ledger-id");
+  if (ledgerId) ledgerId.textContent = s.inventoryId || "—";
+  const accountEmail = $("settings-account-email");
+  if (accountEmail) accountEmail.textContent = store.user?.email || "Signed-in account";
   populateSelect($("box-room"), s.rooms.map(r => ({id:r.id,name:`${r.name} (${r.prefix})`})));
   populateSelect($("box-location"), s.locations);
   populateSelect($("relocate-location"), s.locations);
@@ -354,6 +360,24 @@ $("invite-member").addEventListener("click", async () => {
   catch(e) { $("auth-error").textContent = e.message; }
 });
 $("auth-signout").addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("auth-error").textContent=e.message; } });
+$("copy-ledger-details")?.addEventListener("click", async () => {
+  const s = store.snapshot();
+  const details = `Shack Out Back ledger: ${s.inventoryName || "Household Inventory"}\nLedger ID: ${s.inventoryId || "—"}`;
+  try { await navigator.clipboard.writeText(details); toast("Ledger name and ID copied."); }
+  catch { prompt("Copy these ledger details:", details); }
+});
+$("settings-invite-member")?.addEventListener("click", async () => {
+  $("settings-error").textContent = ""; $("settings-invite-message").textContent = "";
+  try {
+    const email = $("settings-invite-email").value.trim();
+    if (!email) throw new Error("Enter the email address the member used to register.");
+    await store.inviteMember(email);
+    $("settings-invite-message").textContent = "Member added to this ledger. Have them sign in or refresh Shack Out Back.";
+    $("settings-invite-email").value = "";
+    toast("Household member added.");
+  } catch (e) { $("settings-error").textContent = e.message; }
+});
+$("settings-signout")?.addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("settings-error").textContent = e.message; } });
 authChanges(user => { updateAuthScreen(user); });
 window.addEventListener("focus", async () => { if (store.user && store.snapshot().inventoryId) { try { await refreshInventory(); render(); } catch (e) { $("sync-status").textContent = `Sync issue: ${e.message}`; } } });
 (async () => {
