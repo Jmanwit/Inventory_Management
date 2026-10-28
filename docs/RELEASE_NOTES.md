@@ -17,3 +17,11 @@
 - Scanner closes the camera stream on success, cancellation, and dialog close.
 - Bumped service-worker cache to v7 so updated files can deploy together.
 - Device testing is still required; browser support for native QR detection varies.
+
+
+## Search results screen update
+- Search now opens a dedicated, scrollable results dialog instead of silently filtering the inventory list as the user types.
+- Results show box ID, box name, destination, current location, and matching contents/details.
+- Matching text is highlighted to help distinguish similar results such as toothbrushes and paint brushes.
+- Selecting a result opens that box's existing detail record.
+- Service-worker cache version bumped to v8.
