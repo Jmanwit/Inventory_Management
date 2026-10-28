@@ -55,6 +55,7 @@
       <button class="tab active" data-view="inventory" type="button">Inventory</button>
       <button class="tab" data-view="create" type="button">New Box</button>
       <button class="tab" data-view="rooms" type="button">Rooms & Locations</button>
+      <button class="tab" data-view="settings" type="button">Settings & Household</button>
     </nav>
 
     <section id="view-inventory" class="view active" aria-labelledby="inventory-title">
@@ -190,6 +191,25 @@
             <p id="location-error" class="error-message" role="alert"></p>
           </form>
         </div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="view" aria-labelledby="settings-title">
+      <div class="section-heading"><div><p class="eyebrow">HOUSEHOLD MANAGEMENT</p><h2 id="settings-title">Settings & Household</h2></div></div>
+      <div class="form-card settings-card">
+        <h3>Shared household ledger</h3>
+        <p class="muted small">This is the name your household members should look for. Everyone who belongs to this ledger sees the same boxes.</p>
+        <div class="ledger-identity"><span class="muted small">LEDGER NAME</span><strong id="settings-ledger-name">Loading…</strong><span class="muted small">LEDGER ID</span><code id="settings-ledger-id">—</code><button id="copy-ledger-details" class="button button-secondary" type="button">Copy ledger details</button></div>
+        <hr>
+        <h3>Your account</h3><p id="settings-account-email" class="account-email">—</p>
+        <button id="settings-signout" class="button button-secondary" type="button">Sign Out</button>
+        <hr>
+        <h3>Add a household member</h3>
+        <p class="muted small">Your wife should first create and verify her own Shack Out Back account, then sign in once. Enter the exact email she registered with below. This adds her to this existing ledger; she should not create a second household.</p>
+        <label>Household member's registered email<input id="settings-invite-email" type="email" placeholder="name@example.com" autocomplete="email"></label>
+        <button id="settings-invite-member" class="button button-primary" type="button">Add Member to This Ledger</button>
+        <p id="settings-invite-message" class="help-text" role="status"></p>
+        <p id="settings-error" class="error-message" role="alert"></p>
       </div>
     </section>
     </div>
