@@ -74,12 +74,27 @@
           <label>Destination room <span class="required">*</span>
             <select id="box-room" required></select>
           </label>
+          <details class="quick-add"><summary>+ Add a destination room</summary>
+            <div class="quick-add-fields">
+              <label>Room name<input id="quick-room-name" placeholder="Workshop" maxlength="60"></label>
+              <label>Box ID prefix<input id="quick-room-prefix" placeholder="WRK" maxlength="5" autocapitalize="characters"></label>
+              <button id="quick-add-room" class="button button-secondary" type="button">Create & Select Room</button>
+              <p id="quick-room-error" class="error-message" role="alert"></p>
+            </div>
+          </details>
           <label>Short description <span class="required">*</span>
             <input id="box-description" maxlength="70" required placeholder="Pots and Pans">
           </label>
           <label>Current physical location <span class="required">*</span>
             <select id="box-location" required></select>
           </label>
+          <details class="quick-add"><summary>+ Add a physical location</summary>
+            <div class="quick-add-fields">
+              <label>Location name<input id="quick-location-name" placeholder="Moving Truck" maxlength="60"></label>
+              <button id="quick-add-location" class="button button-secondary" type="button">Create & Select Location</button>
+              <p id="quick-location-error" class="error-message" role="alert"></p>
+            </div>
+          </details>
           <label>Packing status
             <select id="box-status">
               <option value="Packed">Packed</option>
@@ -99,9 +114,18 @@
           <p class="help-text">Each line becomes a separate searchable item.</p>
         </div>
         <div class="form-section">
-          <h3>Notes & handling</h3>
-          <label>Notes
-            <textarea id="box-notes" rows="3" placeholder="Heavy. Keep upright."></textarea>
+          <h3>Handling instructions</h3>
+          <p class="muted small">Tap all that apply. These appear on the printed label.</p>
+          <div id="handling-presets" class="handling-presets" aria-label="Common handling instructions"></div>
+          <div class="quick-add custom-instruction-entry">
+            <label for="custom-instruction-text">Add a one-off or reusable instruction</label>
+            <div class="custom-instruction-row"><input id="custom-instruction-text" maxlength="100" placeholder="e.g. Keep away from furnace"><button id="add-custom-instruction" class="button button-secondary" type="button">Add</button></div>
+            <label class="checkbox-label"><input id="save-custom-instruction" type="checkbox" checked> Save this instruction for reuse</label>
+            <p id="handling-error" class="error-message" role="alert"></p>
+          </div>
+          <div id="selected-handling" class="selected-handling"></div>
+          <label>Additional notes
+            <textarea id="box-notes" rows="3" placeholder="Any other details for this box..."></textarea>
           </label>
         </div>
         <div class="form-actions">
