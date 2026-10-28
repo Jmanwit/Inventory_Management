@@ -182,3 +182,13 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 .detail-handling-tags { display: flex; flex-wrap: wrap; gap: 7px; }
 .detail-handling-tags span { display: inline-block; border-radius: 999px; background: #e5eee7; color: #214638; font-weight: 700; padding: 6px 10px; font-size: .9rem; }
 @media (max-width: 480px) { .custom-instruction-row { flex-direction: column; } .custom-instruction-row .button { width: 100%; } }
+
+
+/* Shared Supabase sign-in and household setup */
+.auth-panel { max-width: 620px; margin: 1.5rem auto; }
+.auth-panel h2 { margin-top: .25rem; }
+.auth-panel hr { border: 0; border-top: 1px solid var(--line, #d8d0bf); margin: 1.25rem 0; }
+.auth-panel .inline-form { display: grid; gap: .85rem; }
+.auth-panel .form-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.status-banner { margin: .75rem 0; }
+.hidden { display: none !important; }
