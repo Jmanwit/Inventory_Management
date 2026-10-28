@@ -223,16 +223,25 @@ document.addEventListener("change", event => {
     if (room && !$("box-description").value) $("box-description").placeholder = `e.g. ${room.name} supplies`;
   }
 });
-window.addEventListener("hashchange", () => {
-  const match = location.hash.match(/box=([^&]+)/);
-  if (match) {
-    const id = decodeURIComponent(match[1]);
-    if (store.getBox(id)) openDetail(id);
-    else toast("This box is not in the local inventory on this device.");
-  }
-});
+function handleBoxHash() {
+  const match = location.hash.match(/(?:^#|[&#])box=([^&]+)/);
+  if (!match) return;
+  let id;
+  try { id = decodeURIComponent(match[1]); }
+  catch { toast("That QR code contains an invalid box reference."); return; }
+
+  const box = store.getBox(id);
+  if (box) openDetail(box.id);
+  else toast("This box is not in the local inventory on this device.");
+}
+
+// A QR link usually opens the page with its hash already present. In that case,
+// the browser does not fire hashchange after this module loads, so handle it once
+// after the initial inventory render as well as on subsequent hash changes.
+window.addEventListener("hashchange", handleBoxHash);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service worker registration failed", err)));
 }
 store.subscribe(render);
 render();
+handleBoxHash();
