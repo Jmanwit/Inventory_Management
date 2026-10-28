@@ -54,7 +54,16 @@ function makeLabel(box, preview = false) {
   const id = document.createElement("div"); id.className = "label-id"; id.textContent = box.boxId;
   const room = document.createElement("div"); room.className = "label-room"; room.textContent = box.destination;
   const desc = document.createElement("div"); desc.className = "label-desc"; desc.textContent = box.description;
-  copy.append(id, room, desc);
+  const handling = document.createElement("div");
+  handling.className = "label-handling";
+  const handlingTitle = document.createElement("div");
+  handlingTitle.className = "label-handling-title";
+  handlingTitle.textContent = "HANDLING INSTRUCTIONS";
+  const handlingText = document.createElement("div");
+  handlingText.className = "label-handling-text";
+  handlingText.textContent = (box.notes || "").trim() || "NO SPECIAL HANDLING";
+  handling.append(handlingTitle, handlingText);
+  copy.append(id, room, desc, handling);
   paper.append(qr, copy);
   if (preview) {
     const wrap = document.createElement("div"); wrap.className = "label-preview"; wrap.append(paper); return wrap;
