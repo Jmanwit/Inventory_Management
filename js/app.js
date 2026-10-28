@@ -42,7 +42,7 @@ function populateSelect(select, options, selectedId = null) {
 }
 function render() {
   const s = store.snapshot();
-  const boxes = searchBoxes(s.boxes, $("search-input").value);
+  const boxes = s.boxes;
   $("result-count").textContent = `${boxes.length} box${boxes.length === 1 ? "" : "es"}`;
   $("summary-grid").innerHTML = `
     <div class="summary-card"><strong>${s.boxes.length}</strong><span>Total boxes</span></div>
@@ -56,12 +56,7 @@ function render() {
     button.addEventListener("click", () => openDetail(box.id));
     $("box-list").append(button);
   }
-  $("empty-state").classList.toggle("hidden", s.boxes.length > 0 || $("search-input").value.trim().length > 0);
-  if (s.boxes.length && boxes.length === 0) {
-    const empty = document.createElement("div"); empty.className = "empty-state";
-    empty.innerHTML = "<h3>No matching boxes</h3><p>Try another item, box ID, room, or location.</p>";
-    $("box-list").append(empty);
-  }
+  $("empty-state").classList.toggle("hidden", s.boxes.length > 0);
   renderRoomsAndLocations(s);
   const ledgerName = $("settings-ledger-name");
   if (ledgerName) ledgerName.textContent = s.inventoryName || "Household Inventory";
@@ -198,7 +193,53 @@ document.addEventListener("click", async event => {
     }
   }
 });
-$("search-input").addEventListener("input", render);
+function highlightMatch(value, query) {
+  const text = String(value ?? "");
+  const q = query.trim();
+  if (!q) return escapeHtml(text);
+  const lower = text.toLocaleLowerCase();
+  const needle = q.toLocaleLowerCase();
+  let result = "", from = 0, index;
+  while ((index = lower.indexOf(needle, from)) !== -1) {
+    result += escapeHtml(text.slice(from, index));
+    result += `<mark class="search-highlight">${escapeHtml(text.slice(index, index + q.length))}</mark>`;
+    from = index + q.length;
+  }
+  return result + escapeHtml(text.slice(from));
+}
+
+function openSearchResults(query) {
+  const q = query.trim();
+  if (!q) { toast("Enter an item, box name, ID, room, or location to search."); $("search-input").focus(); return; }
+  const matches = searchBoxes(store.snapshot().boxes, q).sort((a, b) => a.boxId.localeCompare(b.boxId, undefined, { numeric: true }));
+  $("search-results-title").textContent = `Results for “${q}”`;
+  $("search-results-summary").textContent = `${matches.length} matching box${matches.length === 1 ? "" : "es"}. Choose a box to view its full record.`;
+  const host = $("search-results-list"); host.replaceChildren();
+  if (!matches.length) {
+    const empty = document.createElement("div"); empty.className = "search-no-results";
+    empty.innerHTML = `<h3>No matching boxes</h3><p>Nothing matched <strong>${escapeHtml(q)}</strong>. Try a shorter term or a different spelling.</p>`;
+    host.append(empty);
+  }
+  for (const box of matches) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "search-result-card";
+    const matchingItems = (box.items || []).filter(item => item.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
+    const matchingFields = [];
+    if (box.description.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>BOX NAME</span> ${highlightMatch(box.description, q)}</p>`);
+    if (matchingItems.length) matchingFields.push(`<p class="search-match-line"><span>MATCHING CONTENT${matchingItems.length === 1 ? "" : "S"}</span> ${matchingItems.map(item => highlightMatch(item, q)).join(" · ")}</p>`);
+    if (box.boxId.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>BOX ID</span> ${highlightMatch(box.boxId, q)}</p>`);
+    if (box.destination.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>DESTINATION</span> ${highlightMatch(box.destination, q)}</p>`);
+    if (box.currentLocation.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>CURRENT LOCATION</span> ${highlightMatch(box.currentLocation, q)}</p>`);
+    if (!matchingFields.length) matchingFields.push(`<p class="search-match-line">Contains “${escapeHtml(q)}” in notes or other box details.</p>`);
+    button.innerHTML = `<span class="box-id-badge">${escapeHtml(box.boxId)}</span><span class="search-result-copy"><strong>${highlightMatch(box.description, q)}</strong><small>${escapeHtml(box.destination)} · ${box.items.length} item${box.items.length === 1 ? "" : "s"}</small>${matchingFields.join("")}<span class="location-chip">Current location: ${escapeHtml(box.currentLocation)}</span></span><span class="search-result-arrow" aria-hidden="true">›</span>`;
+    button.addEventListener("click", () => { $("search-results-dialog").close(); openDetail(box.id); });
+    host.append(button);
+  }
+  $("search-results-dialog").showModal();
+}
+
+$("search-form").addEventListener("submit", event => { event.preventDefault(); openSearchResults($("search-input").value); });
+$("search-results-close").addEventListener("click", () => $("search-results-dialog").close());
+$("search-results-dialog").addEventListener("close", () => { if (state.activeView === "inventory") $("search-input").focus({ preventScroll: true }); });
 $("box-form").addEventListener("submit", async event => {
   event.preventDefault(); setFieldError("form-error", "");
   try {
