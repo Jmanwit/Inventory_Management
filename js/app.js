@@ -120,7 +120,7 @@ function openDetail(id) {
         <button class="button button-secondary" data-edit="${escapeHtml(box.id)}" type="button">Edit Box</button>
         <button class="button button-secondary danger-button" data-delete="${escapeHtml(box.id)}" type="button">Delete Box</button>
       </div>
-      <p class="help-text">QR payload: stable record identifier. QR rendering is awaiting a bundled local library in this starter.</p>
+      <p class="help-text">QR code identifies this box by its stable record ID. Scanning opens this record on this device when it exists in local inventory.</p>
     </div>`;
   dialog.showModal();
 }
