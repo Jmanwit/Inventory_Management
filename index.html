@@ -69,11 +69,14 @@
           <button class="button button-primary" data-action="new-box" type="button">+ New Box</button>
         </div>
       </div>
-      <label class="search-field">
-        <span class="visually-hidden">Search inventory</span>
-        <span aria-hidden="true">⌕</span>
-        <input id="search-input" type="search" placeholder="Find an item, box, room, or location…" autocomplete="off">
-      </label>
+      <form id="search-form" class="search-form" role="search">
+        <label class="search-field">
+          <span class="visually-hidden">Search inventory</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="search-input" type="search" placeholder="Find an item, box, room, or location…" autocomplete="off">
+        </label>
+        <button class="button button-primary" type="submit">Search Inventory</button>
+      </form>
       <div id="sync-status" class="status-banner" role="status">Local prototype · this device only</div>
       <div class="summary-grid" id="summary-grid"></div>
       <div class="list-heading">
@@ -259,6 +262,17 @@
     </label>
     <button id="print-labels" class="button button-primary full-width" type="button">PRINT 1 LABEL</button>
     <p class="help-text">Printing currently uses the browser print dialog. Direct NIIMBOT B21S printing is not yet implemented.</p>
+  </dialog>
+
+  <dialog id="search-results-dialog" class="search-results-dialog">
+    <div class="dialog-inner">
+      <div class="dialog-head">
+        <div><p class="eyebrow">INVENTORY SEARCH</p><h2 id="search-results-title">Search results</h2></div>
+        <button class="icon-button" id="search-results-close" type="button" aria-label="Close search results">×</button>
+      </div>
+      <p id="search-results-summary" class="muted"></p>
+      <div id="search-results-list" class="search-results-list" aria-live="polite"></div>
+    </div>
   </dialog>
 
   <dialog id="scanner-dialog" class="scanner-dialog">
