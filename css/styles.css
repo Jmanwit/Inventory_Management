@@ -113,6 +113,12 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 .label-copy .label-id { font-weight:900; font-size:1.1rem; letter-spacing:.02em; }
 .label-copy .label-room { font-weight:700; font-size:.9rem; }
 .label-copy .label-desc { margin-top:4px; font-size:.82rem; }
+.label-handling { margin-top:8px; padding-top:6px; border-top:2px solid #222; }
+.label-handling-title { font-size:.62rem; line-height:1.2; font-weight:900; letter-spacing:.08em; }
+.label-handling-text { margin-top:3px; font-size:.86rem; line-height:1.25; font-weight:900; text-transform:uppercase; overflow-wrap:anywhere; white-space:pre-wrap; }
+.label-paper { align-items:flex-start; }
+.label-copy { flex:1; }
+@media print { .label-paper { gap:3mm; } .label-qr { width:32mm; height:32mm; flex-basis:32mm; } .label-copy .label-id { font-size:18pt; } .label-copy .label-room { font-size:12pt; } .label-copy .label-desc { font-size:11pt; } .label-handling-title { font-size:8pt; } .label-handling-text { font-size:12pt; } }
 .quantity-control { margin:10px 0 18px; }
 .quantity-row { display:flex; align-items:center; justify-content:center; gap:20px; margin-top:8px; }
 .quantity-row output { min-width:40px; text-align:center; font-size:1.35rem; font-weight:800; }
