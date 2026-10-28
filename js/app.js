@@ -304,6 +304,122 @@ document.addEventListener("change", event => {
     if (room && !$("box-description").value) $("box-description").placeholder = `e.g. ${room.name} supplies`;
   }
 });
+
+// In-app QR scanning uses the browser's native BarcodeDetector API. This keeps
+// the scanner local/offline-capable without loading camera or QR services from a CDN.
+const scannerDialog = $("scanner-dialog");
+const scannerVideo = $("scanner-video");
+const scannerStatus = $("scanner-status");
+let scannerStream = null;
+let scannerFrame = null;
+let scannerRunning = false;
+let scannerDetector = null;
+
+function stopScanner() {
+  scannerRunning = false;
+  if (scannerFrame !== null) cancelAnimationFrame(scannerFrame);
+  scannerFrame = null;
+  if (scannerStream) scannerStream.getTracks().forEach(track => track.stop());
+  scannerStream = null;
+  if (scannerVideo) scannerVideo.srcObject = null;
+}
+function scannedBoxId(rawValue) {
+  try {
+    const parsed = new URL(rawValue, window.location.href);
+    const match = parsed.hash.match(/(?:^#|[&#])box=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  } catch {}
+  // Also accept a bare stable UUID if a future label format uses one.
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(rawValue).trim())) return String(rawValue).trim();
+  return null;
+}
+async function handleScannedValue(rawValue) {
+  const id = scannedBoxId(rawValue);
+  if (!id) {
+    scannerStatus.textContent = "That QR code isn't a Shack Out Back box label. Keep scanning or try another code.";
+    return false;
+  }
+  stopScanner();
+  scannerStatus.textContent = "QR recognized. Looking up the box in your shared inventory…";
+  try {
+    await refreshInventory();
+    const box = store.getBox(id);
+    scannerDialog.close();
+    if (!box) {
+      toast("That box wasn't found in the current shared inventory.");
+      return true;
+    }
+    showView("inventory");
+    openDetail(box.id);
+    toast(`Found ${box.boxId}.`);
+  } catch (error) {
+    scannerStatus.textContent = `Couldn't look up this box: ${error.message}`;
+    if (!scannerDialog.open) scannerDialog.showModal();
+  }
+  return true;
+}
+async function scanFrame() {
+  if (!scannerRunning || !scannerDetector || !scannerVideo) return;
+  try {
+    if (scannerVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      const codes = await scannerDetector.detect(scannerVideo);
+      if (codes.length) {
+        const found = await handleScannedValue(codes[0].rawValue);
+        if (found) return;
+      }
+    }
+  } catch (error) {
+    console.warn("QR scan frame failed", error);
+  }
+  if (scannerRunning) scannerFrame = requestAnimationFrame(scanFrame);
+}
+$("scan-box-button").addEventListener("click", () => {
+  scannerStatus.textContent = "Ready to start the camera.";
+  $("scanner-start").classList.remove("hidden");
+  scannerDialog.showModal();
+});
+$("scanner-close").addEventListener("click", () => {
+  stopScanner();
+  scannerDialog.close();
+});
+scannerDialog.addEventListener("cancel", stopScanner);
+scannerDialog.addEventListener("close", stopScanner);
+$("scanner-start").addEventListener("click", async () => {
+  scannerStatus.textContent = "";
+  if (!("BarcodeDetector" in window)) {
+    scannerStatus.textContent = "QR scanning isn't supported by this browser. Try the latest Chrome on Android, then reopen Shack Out Back.";
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    scannerStatus.textContent = "Camera access isn't available. Open Shack Out Back from its HTTPS GitHub Pages address.";
+    return;
+  }
+  try {
+    const supported = await window.BarcodeDetector.getSupportedFormats?.();
+    if (supported && !supported.includes("qr_code")) {
+      scannerStatus.textContent = "This browser's camera scanner doesn't support QR codes.";
+      return;
+    }
+    scannerDetector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    scannerVideo.srcObject = scannerStream;
+    await scannerVideo.play();
+    scannerRunning = true;
+    $("scanner-start").classList.add("hidden");
+    scannerStatus.textContent = "Camera is on. Hold the QR code inside the frame.";
+    scannerFrame = requestAnimationFrame(scanFrame);
+  } catch (error) {
+    stopScanner();
+    scannerStatus.textContent = error.name === "NotAllowedError"
+      ? "Camera permission was denied. Allow camera access in your browser's site settings, then try again."
+      : `Couldn't start the camera: ${error.message || error.name}. Check camera permission and close other camera apps.`;
+    $("scanner-start").classList.remove("hidden");
+  }
+});
+
 window.addEventListener("hashchange", () => {
   const match = location.hash.match(/box=([^&]+)/);
   if (match) {
