@@ -22,4 +22,4 @@ export const MAX_LABEL_COPIES = 20;
 
 // Supabase public browser configuration. Paste only your project URL and publishable key here.
 export const SUPABASE_URL = "https://ygzmzhaomvbgepayhxki.supabase.co";
-export const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jx7zpCtHsWmHc5c6lhK82A_pHxg2yVg";
