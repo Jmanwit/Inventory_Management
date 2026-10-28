@@ -192,3 +192,13 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 .auth-panel .form-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
 .status-banner { margin: .75rem 0; }
 .hidden { display: none !important; }
+
+/* Household settings view */
+.settings-card { max-width:760px; }
+.settings-card h3 { color:var(--green); font:600 1.15rem Georgia,serif; margin:0 0 8px; }
+.settings-card hr { border:0; border-top:1px solid var(--line); margin:22px 0; }
+.ledger-identity { display:grid; gap:6px; padding:14px; margin:14px 0; border:1px solid var(--line); border-radius:10px; background:var(--paper); overflow-wrap:anywhere; }
+.ledger-identity strong { font:600 1.3rem Georgia,serif; color:var(--green); }
+.ledger-identity code { font-size:.82rem; }
+.ledger-identity .button { justify-self:start; margin-top:6px; }
+.account-email { font-weight:750; overflow-wrap:anywhere; }
