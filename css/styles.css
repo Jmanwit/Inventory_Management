@@ -245,3 +245,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 .invite-only-notice { border: 1px solid var(--line, #d8d0bf); border-left: 4px solid var(--forest, #214536); border-radius: 10px; padding: 1rem 1.1rem; margin: 1rem 0 1.25rem; background: rgba(214, 198, 157, .14); }
 .invite-only-notice h3 { margin: 0 0 .35rem; }
 .admin-invite-panel { margin-top: 1.25rem; padding-top: .25rem; }
+
+/* Multi-ledger selector and room management */
+.active-ledger-control { display:flex; flex-direction:column; gap:.25rem; min-width:145px; max-width:260px; margin-left:auto; }
+.active-ledger-control label { font-size:.62rem; letter-spacing:.12em; font-weight:800; color:var(--muted, #766f63); }
+.active-ledger-control select { width:100%; max-width:100%; min-width:0; border:1px solid var(--line, #d8d0c2); border-radius:10px; background:var(--paper, #fffdf7); color:var(--ink, #302b24); padding:.55rem .65rem; font:inherit; font-weight:700; }
+.room-delete-button { flex-shrink:0; font-size:.85rem; padding:.45rem .65rem; }
+@media (max-width:560px) { .topbar { flex-wrap:wrap; } .active-ledger-control { order:3; flex:1 1 100%; max-width:none; margin-left:0; } }
