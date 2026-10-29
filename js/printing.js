@@ -17,6 +17,8 @@ const PRINTER_MODEL = {
 const LABEL_SIZE = { w_px: 384, h_px: 640, offset_y_px: 4 };
 
 let currentBox = null;
+let preparedImageUrl = null;
+let preparationToken = 0;
 let quantity = readQuantity();
 let printing = false;
 
@@ -39,7 +41,7 @@ export function setupPrinting({ host, quantityOutput, minusButton, plusButton, p
     printButton.textContent = `PRINT ${quantity} LABEL${quantity === 1 ? "" : "S"}`;
     minusButton.disabled = quantity <= 1 || printing;
     plusButton.disabled = quantity >= MAX_LABEL_COPIES || printing;
-    printButton.disabled = printing;
+    printButton.disabled = printing || !preparedImageUrl;
   }
   minusButton.addEventListener("click", () => {
     quantity = Math.max(1, quantity - 1); saveQuantity(); updateQuantity();
@@ -61,22 +63,23 @@ export function setupPrinting({ host, quantityOutput, minusButton, plusButton, p
       onToast?.(message);
       return;
     }
+    if (!preparedImageUrl) {
+      if (status) status.textContent = "The label image is still being prepared. Please wait a moment and try again.";
+      return;
+    }
     printing = true;
     updateQuantity();
     if (status) status.textContent = "Connecting to NIIMBOT printer and sending label… Keep this screen open.";
     try {
-      const imageUrl = makePrintImageUrl(currentBox);
-      try {
-        // Called from the button's click handler so Chrome can display its Bluetooth chooser.
-        await window.Niimbot.printImage(imageUrl, {
-          model: PRINTER_MODEL,
-          size: LABEL_SIZE,
-          copies: quantity,
-          density: 3
-        });
-      } finally {
-        URL.revokeObjectURL(imageUrl);
-      }
+      // The PNG is prepared before this click, so Web Bluetooth's chooser is invoked
+      // directly within the user's gesture. Keep the URL alive for repeat prints.
+      const printPromise = window.Niimbot.printImage(preparedImageUrl, {
+        model: PRINTER_MODEL,
+        size: LABEL_SIZE,
+        copies: quantity,
+        density: 3
+      });
+      await printPromise;
       const printedQuantity = quantity;
       if (status) status.textContent = `Printer confirmed ${printedQuantity} label${printedQuantity === 1 ? "" : "s"}.`;
       onToast?.(`Sent ${printedQuantity} label${printedQuantity === 1 ? "" : "s"} to the NIIMBOT printer.`);
@@ -94,10 +97,27 @@ export function setupPrinting({ host, quantityOutput, minusButton, plusButton, p
 
   function show(box) {
     currentBox = box;
+    const token = ++preparationToken;
+    if (preparedImageUrl) URL.revokeObjectURL(preparedImageUrl);
+    preparedImageUrl = null;
     host.replaceChildren();
     host.append(makeLabel(box, true));
-    if (status) status.textContent = "Ready to print directly to a compatible NIIMBOT printer. First use may ask you to select the printer.";
+    if (status) status.textContent = "Preparing the label image for the printer…";
     updateQuantity();
+    preparePrintImageUrl(box).then(imageUrl => {
+      if (token !== preparationToken || currentBox !== box) {
+        URL.revokeObjectURL(imageUrl);
+        return;
+      }
+      preparedImageUrl = imageUrl;
+      if (status) status.textContent = "Label ready. Tap Print Label; choose the B21S if the Bluetooth picker appears.";
+      updateQuantity();
+    }).catch(error => {
+      console.error("Could not prepare NIIMBOT label image", error);
+      if (token !== preparationToken) return;
+      if (status) status.textContent = `Could not prepare label image: ${error?.message || "image conversion failed"}`;
+      updateQuantity();
+    });
   }
   return { show };
 }
@@ -143,7 +163,7 @@ function splitLines(value, maxChars) {
   return lines.length ? lines : [""];
 }
 
-function makePrintImageUrl(box) {
+function makePrintSvgUrl(box) {
   const qrHost = document.createElement("div");
   if (!renderQr(qrHost, box)) throw new Error("Could not generate the box QR code.");
   const qrSvg = qrHost.querySelector("svg");
@@ -170,4 +190,37 @@ function makePrintImageUrl(box) {
   parts.push('</g></svg>');
   const blob = new Blob([parts.join("")], { type: "image/svg+xml;charset=utf-8" });
   return URL.createObjectURL(blob);
+}
+
+// The NIIMBOT driver decodes its source image as a bitmap. Android Chrome can
+// display our SVG preview but some image decoders reject SVG blobs directly, so
+// rasterize it to a real PNG before the user presses Print.
+async function preparePrintImageUrl(box) {
+  const svgUrl = makePrintSvgUrl(box);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = svgUrl;
+    if (typeof image.decode === "function") await image.decode();
+    else await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("The label artwork could not be rendered."));
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = LABEL_SIZE.w_px;
+    canvas.height = LABEL_SIZE.h_px;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pngBlob = await new Promise((resolve, reject) => {
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("The browser could not encode the label as PNG.")), "image/png");
+    });
+    if (pngBlob.type !== "image/png") throw new Error("The browser did not create a PNG image.");
+    return URL.createObjectURL(pngBlob);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
 }
