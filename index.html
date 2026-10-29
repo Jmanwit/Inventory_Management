@@ -33,8 +33,18 @@
         <label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
         <label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="Your password"></label>
         <div class="form-actions"><button class="button button-primary" type="submit">Sign In</button></div>
+        <div class="form-actions"><button id="forgot-password" class="button button-quiet" type="button">Set or reset password</button></div>
         <p id="auth-error" class="error-message" role="alert"></p>
         <p id="auth-message" class="help-text" role="status"></p>
+      </form>
+      <form id="password-setup-form" class="inline-form hidden">
+        <h3 id="password-setup-title">Finish setting up your account</h3>
+        <p id="password-setup-description" class="muted small">Choose a password you can use the next time you sign in.</p>
+        <label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="8" required placeholder="At least 8 characters"></label>
+        <label>Confirm password<input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required placeholder="Enter it again"></label>
+        <div class="form-actions"><button class="button button-primary" type="submit">Save Password</button><button id="cancel-password-setup" class="button button-secondary" type="button">Cancel</button></div>
+        <p id="password-setup-error" class="error-message" role="alert"></p>
+        <p id="password-setup-message" class="help-text" role="status"></p>
       </form>
       <div id="household-setup" class="hidden">
         <hr><h3>Create your household ledger</h3><p class="muted small">Your invitation gives you access to Shack Out Back, not to another household's inventory. Create your own ledger here.</p>
