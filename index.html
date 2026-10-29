@@ -261,7 +261,7 @@
       </div>
     </label>
     <button id="print-labels" class="button button-primary full-width" type="button">PRINT 1 LABEL</button>
-    <p class="help-text">Printing currently uses the browser print dialog. Direct NIIMBOT B21S printing is not yet implemented.</p>
+    <p id="print-status" class="help-text" role="status" aria-live="polite">Ready to print directly to a compatible NIIMBOT printer. First use may ask you to select the printer.</p>
   </dialog>
 
   <dialog id="search-results-dialog" class="search-results-dialog">
@@ -311,6 +311,7 @@
     <span>Shack Out Back</span>
     <span id="footer-status">Shared inventory · beta</span>
   </footer>
+  <script src="https://cdn.jsdelivr.net/npm/niimbot-web-bluetooth@2.6.0/src/niimbot.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
