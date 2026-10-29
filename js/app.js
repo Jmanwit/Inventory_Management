@@ -1,4 +1,4 @@
-import { store, signIn, signOut, currentUser, authChanges, refreshInventory } from "./store.js";
+import { store, signIn, signOut, currentUser, authChanges, refreshInventory, setPassword, requestPasswordReset } from "./store.js";
 import { APP_ADMIN_EMAIL } from "./config.js";
 import { searchBoxes } from "./search.js";
 import { setupPrinting } from "./printing.js";
@@ -540,9 +540,20 @@ function setWorkspaceVisible(visible) {
   $("workspace").classList.toggle("hidden", !visible);
   $("auth-panel").classList.toggle("hidden", visible);
 }
+const passwordSetupForm = $("password-setup-form");
+let passwordSetupActive = new URLSearchParams(location.search).get("set-password") === "1";
 async function updateAuthScreen(user) {
   const householdSetup = $("household-setup"), invite = $("household-invite"), tools = $("signed-in-tools");
   $("auth-error").textContent = ""; $("auth-message").textContent = "";
+  if (passwordSetupActive) {
+    setWorkspaceVisible(false); householdSetup.classList.add("hidden"); invite.classList.add("hidden");
+    $("auth-form").classList.add("hidden"); passwordSetupForm.classList.remove("hidden");
+    tools.classList.add("hidden");
+    $("password-setup-title").textContent = user ? "Finish setting up your account" : "Set or reset your password";
+    $("password-setup-description").textContent = user ? "Choose a password before continuing to your household ledger." : "Open the password-reset email on this device, then choose a new password.";
+    return;
+  }
+  passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
   if (!user) {
     setWorkspaceVisible(false); householdSetup.classList.add("hidden"); invite.classList.add("hidden"); tools.classList.add("hidden");
     $("auth-email").disabled = false; $("auth-password").disabled = false; return;
@@ -562,6 +573,34 @@ $("auth-form").addEventListener("submit", async event => {
   event.preventDefault(); $("auth-error").textContent = ""; $("auth-message").textContent = "";
   try { const user = await signIn($("auth-email").value.trim(), $("auth-password").value); await updateAuthScreen(user); }
   catch (e) { $("auth-error").textContent = e.message; }
+});
+
+$("forgot-password").addEventListener("click", async () => {
+  $("auth-error").textContent = ""; $("auth-message").textContent = "";
+  const email = $("auth-email").value.trim();
+  if (!email) { $("auth-error").textContent = "Enter your email address first."; return; }
+  try { await requestPasswordReset(email); $("auth-message").textContent = "If an account exists for that address, a password-reset email has been sent. Open it on this device to choose a password."; }
+  catch (e) { $("auth-error").textContent = e.message; }
+});
+passwordSetupForm.addEventListener("submit", async event => {
+  event.preventDefault(); $("password-setup-error").textContent = ""; $("password-setup-message").textContent = "";
+  const password = $("new-password").value, confirm = $("confirm-password").value;
+  if (password.length < 8) { $("password-setup-error").textContent = "Use a password with at least 8 characters."; return; }
+  if (password !== confirm) { $("password-setup-error").textContent = "The passwords do not match."; return; }
+  try {
+    await setPassword(password);
+    passwordSetupActive = false;
+    history.replaceState({}, "", location.pathname);
+    $("new-password").value = ""; $("confirm-password").value = "";
+    passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
+    await updateAuthScreen(await currentUser());
+    toast("Password saved. Your account is ready.");
+  } catch (e) { $("password-setup-error").textContent = e.message || "Could not save password. Reopen the invitation or password-reset link and try again."; }
+});
+$("cancel-password-setup").addEventListener("click", async () => {
+  passwordSetupActive = false; history.replaceState({}, "", location.pathname);
+  passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
+  await updateAuthScreen(await currentUser());
 });
 
 $("create-household").addEventListener("click", async () => {

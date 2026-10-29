@@ -47,6 +47,8 @@ export const store = {
 };
 export async function signIn(email,password){const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;user=data.user;await refresh();return data.user;}
 export async function signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;user=null;await refresh();}
+export async function setPassword(password){const {data,error}=await supabase.auth.updateUser({password});if(error)throw error;user=data.user;return data.user;}
+export async function requestPasswordReset(email){const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:"https://jmanwit.github.io/Inventory_Management/?set-password=1"});if(error)throw error;}
 export async function currentUser(){const {data,error}=await supabase.auth.getUser();if(error && error.name!=="AuthSessionMissingError")throw error;user=data?.user||null;return user;}
 export function authChanges(callback){return supabase.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;queueMicrotask(()=>callback(user));});}
 export async function refreshInventory(){return refresh();}
