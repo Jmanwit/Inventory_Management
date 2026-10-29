@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    redirectTo: "https://jmanwit.github.io/Inventory_Management/",
+    redirectTo: "https://jmanwit.github.io/Inventory_Management/?set-password=1",
   });
   if (error) {
     const message = /already|registered|exists/i.test(error.message)
