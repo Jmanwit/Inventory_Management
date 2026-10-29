@@ -1,23 +1,23 @@
-# NIIMBOT B21S Printing Investigation
+# NIIMBOT B21S Printing
 
-## Target
+## Current implementation
 
-NIIMBOT B21S, thermal, 203 DPI, nominal maximum print width around 48 mm. Confirm the exact roll dimensions before finalizing label CSS.
+- Direct browser-to-printer Bluetooth printing uses the `niimbot-web-bluetooth` 2.6.0 browser driver loaded from jsDelivr. The project is open source and the B21S is not listed as a fully validated model; the user has successfully printed a 50 x 30 mm test label from its live demo using the B1 task. Treat B21S support as promising but still hardware-validation-in-progress.
+- The SOB print workflow uses the B1/203 dpi protocol family with open Bluetooth discovery (`name_prefixes: []`) and a 384 x 640 px image, representing a 50 x 80 mm roll within the printer's approximately 48 mm printable width. The existing landscape design is rotated 90 degrees for the portrait stock/feed direction.
+- Copy count defaults to 1 and persists locally per browser/device. Changing +/− updates that device's future default.
+- No inventory records or Supabase schema are changed by printing.
 
-## Current status
+## Important test notes
 
-The starter only offers the browser print dialog. Direct Bluetooth printing is not implemented or verified. QR rendering is also awaiting a bundled local QR library.
+1. Use Chrome/Edge/Opera/Samsung Internet on Android, over HTTPS, with Bluetooth enabled. Android may also require Location services enabled for BLE discovery.
+2. On the first print, choose the B21S in the browser Bluetooth picker. The printer may need to be disconnected from the NIIMBOT app first.
+3. Verify the printed label fills the 50 x 80 mm stock correctly and is not clipped or upside down. The first version uses a 384 x 640 pixel canvas at 203 dpi and a small vertical offset; adjust only after measuring an actual label.
+4. Scan the printed QR from both household devices and verify it opens the exact box record.
+5. Test one copy, then three copies. Confirm the browser reports success only after the driver confirms printing.
+6. Test connection drop/reconnect and repeat on both household Android devices.
 
-## Test sequence
+## Known limitations
 
-1. Identify the exact label-roll dimensions and printable width.
-2. Print a calibration label from a browser and measure it.
-3. Bundle a QR library locally and confirm printed QR scans from both phones.
-4. Test a simple label from the NIIMBOT Android app.
-5. Investigate whether the B21S exposes a supported browser Bluetooth interface and whether the printer protocol is compatible.
-6. Test repeated prints without reselecting the printer.
-7. Test disconnect/reconnect and retry behavior.
-8. Test the same workflow from the S23 Ultra and S25 Ultra.
-9. Document a fallback if direct printing is not reliable.
-
-Do not claim direct Bluetooth support until tested on the actual hardware. A generic Bluetooth printer listing does not prove protocol compatibility.
+- The upstream driver has validated other NIIMBOT models, but not the B21S specifically. The B21S test with the demo printed successfully under the B1 protocol, but the integrated 50 x 80 mm design still needs validation on real paper.
+- The driver is loaded from a pinned CDN URL, so the initial app load needs internet access to retrieve it. If it fails to load, SOB shows an explicit message instead of silently opening Android's Letter-sized print dialog.
+- Browser direct printing requires Web Bluetooth. Unsupported browsers cannot use this direct route.
