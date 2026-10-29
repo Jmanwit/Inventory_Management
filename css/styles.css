@@ -234,3 +234,8 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 @media (max-width:480px) { .inventory-actions { width:100%; } .inventory-actions .button { flex:1; } }
 
 @media (max-width:480px) { .search-form { grid-template-columns:1fr; } .search-form > .button { width:100%; } .search-result-card { gap:8px; padding:11px; } .search-result-card .box-id-badge { min-width:58px; font-size:.68rem; } }
+
+/* Printed handling-text character budget */
+.handling-character-count { margin-top: 4px; }
+.handling-character-count.over-limit { color: #a12d24; font-weight: 750; }
+.custom-handling-chip { touch-action: manipulation; }
