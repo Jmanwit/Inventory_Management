@@ -239,3 +239,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px so
 .handling-character-count { margin-top: 4px; }
 .handling-character-count.over-limit { color: #a12d24; font-weight: 750; }
 .custom-handling-chip { touch-action: manipulation; }
+
+
+/* Invitation-only beta welcome and administrator tools */
+.invite-only-notice { border: 1px solid var(--line, #d8d0bf); border-left: 4px solid var(--forest, #214536); border-radius: 10px; padding: 1rem 1.1rem; margin: 1rem 0 1.25rem; background: rgba(214, 198, 157, .14); }
+.invite-only-notice h3 { margin: 0 0 .35rem; }
+.admin-invite-panel { margin-top: 1.25rem; padding-top: .25rem; }
