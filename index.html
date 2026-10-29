@@ -21,24 +21,29 @@
 
   <main class="app-shell">
     <section id="auth-panel" class="auth-panel form-card">
-      <p class="eyebrow">SHARED HOUSEHOLD LEDGER</p>
-      <h2>Connect your household</h2>
-      <p class="muted">Sign in to access the shared inventory. Your data is stored in your Supabase project, not just this browser.</p>
+      <p class="eyebrow">INVITATION-ONLY BETA</p>
+      <h2>Welcome to Shack Out Back</h2>
+      <p class="muted">Know what you own. Know where it is. Organize household boxes, track their contents, and find them again with QR-coded labels.</p>
+      <div class="invite-only-notice">
+        <h3>Access is currently by invitation only.</h3>
+        <p class="muted small">If you've received an invitation email, follow its link to activate your account. Otherwise, please ask the person who invited you—or the Shack Out Back administrator—to send you an invitation.</p>
+      </div>
       <form id="auth-form" class="inline-form">
+        <h3>Already have an account?</h3>
         <label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
-        <label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
-        <div class="form-actions"><button class="button button-primary" type="submit">Sign In</button><button id="auth-signup" class="button button-secondary" type="button">Create Account</button></div>
+        <label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="Your password"></label>
+        <div class="form-actions"><button class="button button-primary" type="submit">Sign In</button></div>
         <p id="auth-error" class="error-message" role="alert"></p>
         <p id="auth-message" class="help-text" role="status"></p>
       </form>
       <div id="household-setup" class="hidden">
-        <hr><h3>Create the shared household</h3><p class="muted small">Do this once, using the account that should own the inventory.</p>
+        <hr><h3>Create your household ledger</h3><p class="muted small">Your invitation gives you access to Shack Out Back, not to another household's inventory. Create your own ledger here.</p>
         <label>Household name<input id="household-name" value="Shack Out Back Household" maxlength="80"></label>
         <button id="create-household" class="button button-primary" type="button">Create Household Inventory</button>
       </div>
       <div id="household-invite" class="hidden">
-        <hr><h3>Add your wife's account</h3><p class="muted small">She must create her own account first. Then enter the same email address she used to register.</p>
-        <label>Her registered email<input id="invite-email" type="email" placeholder="wife@example.com"></label>
+        <hr><h3>Invite someone to your ledger</h3><p class="muted small">This adds an existing account to your household inventory. It does not create a new Shack Out Back account.</p>
+        <label>Household member's registered email<input id="invite-email" type="email" placeholder="name@example.com"></label>
         <button id="invite-member" class="button button-secondary" type="button">Add Household Member</button>
         <p id="invite-message" class="help-text" role="status"></p>
       </div>
@@ -216,6 +221,16 @@
         <label>Household member's registered email<input id="settings-invite-email" type="email" placeholder="name@example.com" autocomplete="email"></label>
         <button id="settings-invite-member" class="button button-primary" type="button">Add Member to This Ledger</button>
         <p id="settings-invite-message" class="help-text" role="status"></p>
+        <section id="app-invitation-admin" class="hidden admin-invite-panel">
+          <hr>
+          <p class="eyebrow">ADMINISTRATOR</p>
+          <h3>Invite someone to Shack Out Back</h3>
+          <p class="muted small">Send an invitation to create an account and start a separate household ledger. This does not add them to your ledger.</p>
+          <label>Invitee email address<input id="app-invite-email" type="email" autocomplete="email" placeholder="friend@example.com"></label>
+          <button id="send-app-invite" class="button button-primary" type="button">Send App Invitation</button>
+          <p id="app-invite-message" class="help-text" role="status"></p>
+          <p id="app-invite-error" class="error-message" role="alert"></p>
+        </section>
         <p id="settings-error" class="error-message" role="alert"></p>
       </div>
     </section>
