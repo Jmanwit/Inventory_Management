@@ -21,3 +21,8 @@
 - The upstream driver has validated other NIIMBOT models, but not the B21S specifically. The B21S test with the demo printed successfully under the B1 protocol, but the integrated 50 x 80 mm design still needs validation on real paper.
 - The driver is loaded from a pinned CDN URL, so the initial app load needs internet access to retrieve it. If it fails to load, SOB shows an explicit message instead of silently opening Android's Letter-sized print dialog.
 - Browser direct printing requires Web Bluetooth. Unsupported browsers cannot use this direct route.
+
+
+### Label readability refinement
+
+The handling-instruction content is rendered in a larger, heavier 27 px type size, with tighter wrapping so up to three lines remain readable. The “HANDLING INSTRUCTIONS” heading is unchanged. Service-worker cache version is bumped to v11 so deployed clients fetch the updated printing module.
