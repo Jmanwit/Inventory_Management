@@ -25,4 +25,4 @@ export const SUPABASE_URL = "https://ygzmzhaomvbgepayhxki.supabase.co";
 export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jx7zpCtHsWmHc5c6lhK82A_pHxg2yVg";
 
 // UI visibility only. The Edge Function independently enforces this address server-side. Replace before deployment.
-export const APP_ADMIN_EMAIL = "REPLACE_WITH_YOUR_ADMIN_EMAIL";
+export const APP_ADMIN_EMAIL = "JustinLucenti@gmail.com";
