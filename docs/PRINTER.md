@@ -26,3 +26,10 @@
 ### Label readability refinement
 
 The handling-instruction content is rendered in a larger, heavier 27 px type size, with tighter wrapping so up to three lines remain readable. The “HANDLING INSTRUCTIONS” heading is unchanged. Service-worker cache version is bumped to v11 so deployed clients fetch the updated printing module.
+
+
+## Handling text and saved quick instructions
+
+The printed handling area currently supports about 66 characters (three lines at a 22-character wrap target). The form shows a live approximate count including selected quick instructions and additional notes. Text over the budget may be clipped; use concise wording when possible. Font metrics and word wrapping mean the count is a practical warning rather than a guarantee for every character combination.
+
+Saved custom quick-instruction chips can be pressed and held to delete the reusable template. This removes it from the quick-button list but does not rewrite existing boxes that already contain that instruction. Built-in standard presets cannot be deleted.
