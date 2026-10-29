@@ -186,7 +186,7 @@ function makePrintSvgUrl(box) {
   parts.push(`<text x="${x}" y="${ruleY + 34}" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="900" letter-spacing="1.5" fill="#000">HANDLING INSTRUCTIONS</text>`);
   const handlingLines = [...new Set([...(box.handlingInstructions || []), ...(box.notes || "").split(/\r?\n/).map(v => v.trim()).filter(Boolean)])];
   const handlingText = handlingLines.join(" · ") || "NO SPECIAL HANDLING";
-  splitLines(handlingText.toUpperCase(), 27).slice(0, 3).forEach((line, i) => parts.push(`<text x="${x}" y="${ruleY + 72 + i * 25}" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="900" fill="#000">${xmlEscape(line)}</text>`));
+  splitLines(handlingText.toUpperCase(), 22).slice(0, 3).forEach((line, i) => parts.push(`<text x="${x}" y="${ruleY + 76 + i * 31}" font-family="Arial,Helvetica,sans-serif" font-size="27" font-weight="900" fill="#000">${xmlEscape(line)}</text>`));
   parts.push('</g></svg>');
   const blob = new Blob([parts.join("")], { type: "image/svg+xml;charset=utf-8" });
   return URL.createObjectURL(blob);
