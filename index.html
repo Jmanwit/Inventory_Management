@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#214536">
+  <meta name="description" content="Know what you own. Know where it is.">
+  <title>Shack Out Back</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">SOB</div>
+    <div class="brand-copy">
+      <p class="eyebrow">HOUSEHOLD INVENTORY</p>
+      <h1>Shack Out Back</h1>
+    </div>
+    <button id="menu-export" class="button button-quiet" type="button">Export</button>
+  </header>
+
+  <main class="app-shell">
+    <section id="auth-panel" class="auth-panel form-card">
+      <p class="eyebrow">SHARED HOUSEHOLD LEDGER</p>
+      <h2>Connect your household</h2>
+      <p class="muted">Sign in to access the shared inventory. Your data is stored in your Supabase project, not just this browser.</p>
+      <form id="auth-form" class="inline-form">
+        <label>Email address<input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+        <label>Password<input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+        <div class="form-actions"><button class="button button-primary" type="submit">Sign In</button><button id="auth-signup" class="button button-secondary" type="button">Create Account</button></div>
+        <p id="auth-error" class="error-message" role="alert"></p>
+        <p id="auth-message" class="help-text" role="status"></p>
+      </form>
+      <div id="household-setup" class="hidden">
+        <hr><h3>Create the shared household</h3><p class="muted small">Do this once, using the account that should own the inventory.</p>
+        <label>Household name<input id="household-name" value="Shack Out Back Household" maxlength="80"></label>
+        <button id="create-household" class="button button-primary" type="button">Create Household Inventory</button>
+      </div>
+      <div id="household-invite" class="hidden">
+        <hr><h3>Add your wife's account</h3><p class="muted small">She must create her own account first. Then enter the same email address she used to register.</p>
+        <label>Her registered email<input id="invite-email" type="email" placeholder="wife@example.com"></label>
+        <button id="invite-member" class="button button-secondary" type="button">Add Household Member</button>
+        <p id="invite-message" class="help-text" role="status"></p>
+      </div>
+      <div id="signed-in-tools" class="hidden"><hr><p id="signed-in-label" class="muted small"></p><button id="auth-signout" class="button button-secondary" type="button">Sign Out</button></div>
+    </section>
+    <div id="workspace" class="hidden">
+    <section class="intro-panel">
+      <p class="eyebrow">THE HOUSEHOLD LEDGER</p>
+      <h2>Know what you own.<br><em>Know where it is.</em></h2>
+      <p class="muted">A dependable record of every box, its contents, and where it lives now.</p>
+    </section>
+
+    <nav class="tabs" aria-label="Main navigation">
+      <button class="tab active" data-view="inventory" type="button">Inventory</button>
+      <button class="tab" data-view="create" type="button">New Box</button>
+      <button class="tab" data-view="rooms" type="button">Rooms & Locations</button>
+      <button class="tab" data-view="settings" type="button">Settings & Household</button>
+    </nav>
+
+    <section id="view-inventory" class="view active" aria-labelledby="inventory-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">YOUR RECORDS</p>
+          <h2 id="inventory-title">Inventory</h2>
+        </div>
+        <div class="inventory-actions">
+          <button id="scan-box-button" class="button button-secondary" type="button">▦ Scan QR</button>
+          <button class="button button-primary" data-action="new-box" type="button">+ New Box</button>
+        </div>
+      </div>
+      <form id="search-form" class="search-form" role="search">
+        <label class="search-field">
+          <span class="visually-hidden">Search inventory</span>
+          <span aria-hidden="true">⌕</span>
+          <input id="search-input" type="search" placeholder="Find an item, box, room, or location…" autocomplete="off">
+        </label>
+        <button class="button button-primary" type="submit">Search Inventory</button>
+      </form>
+      <div id="sync-status" class="status-banner" role="status">Local prototype · this device only</div>
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="list-heading">
+        <h3>Boxes</h3>
+        <span id="result-count" class="muted small">0 boxes</span>
+      </div>
+      <div id="box-list" class="box-list"></div>
+      <div id="empty-state" class="empty-state">
+        <div class="empty-ornament" aria-hidden="true">✦</div>
+        <h3>Your ledger starts here.</h3>
+        <p>Create your first box, record what's inside, and assign where it is right now.</p>
+        <button class="button button-primary" data-action="new-box" type="button">Create First Box</button>
+      </div>
+    </section>
+
+    <section id="view-create" class="view" aria-labelledby="form-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">ADD TO THE LEDGER</p>
+          <h2 id="form-title">Create a box</h2>
+        </div>
+      </div>
+      <form id="box-form" class="form-card">
+        <input id="box-internal-id" type="hidden">
+        <div class="form-section">
+          <h3>Box identity</h3>
+          <label>Destination room <span class="required">*</span>
+            <select id="box-room" required></select>
+          </label>
+          <details class="quick-add"><summary>+ Add a destination room</summary>
+            <div class="quick-add-fields">
+              <label>Room name<input id="quick-room-name" placeholder="Workshop" maxlength="60"></label>
+              <label>Box ID prefix<input id="quick-room-prefix" placeholder="WRK" maxlength="5" autocapitalize="characters"></label>
+              <button id="quick-add-room" class="button button-secondary" type="button">Create & Select Room</button>
+              <p id="quick-room-error" class="error-message" role="alert"></p>
+            </div>
+          </details>
+          <label>Short description <span class="required">*</span>
+            <input id="box-description" maxlength="70" required placeholder="Pots and Pans">
+          </label>
+          <label>Current physical location <span class="required">*</span>
+            <select id="box-location" required></select>
+          </label>
+          <details class="quick-add"><summary>+ Add a physical location</summary>
+            <div class="quick-add-fields">
+              <label>Location name<input id="quick-location-name" placeholder="Moving Truck" maxlength="60"></label>
+              <button id="quick-add-location" class="button button-secondary" type="button">Create & Select Location</button>
+              <p id="quick-location-error" class="error-message" role="alert"></p>
+            </div>
+          </details>
+          <label>Packing status
+            <select id="box-status">
+              <option value="Packed">Packed</option>
+              <option value="In progress">In progress</option>
+              <option value="Unpacked">Unpacked</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-section">
+          <div class="section-heading compact">
+            <h3>Individual contents</h3>
+            <span class="muted small">One item per line</span>
+          </div>
+          <label>What's inside?
+            <textarea id="box-items" rows="5" placeholder="Lodge Cast Iron Pan&#10;Dutch Oven&#10;Stainless Steel Stockpot"></textarea>
+          </label>
+          <p class="help-text">Each line becomes a separate searchable item.</p>
+        </div>
+        <div class="form-section">
+          <h3>Handling instructions</h3>
+          <p class="muted small">Tap all that apply. These appear on the printed label.</p>
+          <div id="handling-presets" class="handling-presets" aria-label="Common handling instructions"></div>
+          <div class="quick-add custom-instruction-entry">
+            <label for="custom-instruction-text">Add a one-off or reusable instruction</label>
+            <div class="custom-instruction-row"><input id="custom-instruction-text" maxlength="100" placeholder="e.g. Keep away from furnace"><button id="add-custom-instruction" class="button button-secondary" type="button">Add</button></div>
+            <label class="checkbox-label"><input id="save-custom-instruction" type="checkbox" checked> Save this instruction for reuse</label>
+            <p id="handling-error" class="error-message" role="alert"></p>
+          </div>
+          <div id="selected-handling" class="selected-handling"></div>
+          <label>Additional notes
+            <textarea id="box-notes" rows="3" placeholder="Any other details for this box..."></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button id="cancel-edit" class="button button-secondary hidden" type="button">Cancel</button>
+          <button class="button button-primary" type="submit">Save Box</button>
+        </div>
+        <p id="form-error" class="error-message" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="view-rooms" class="view" aria-labelledby="rooms-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">YOUR PLACES</p>
+          <h2 id="rooms-title">Rooms & locations</h2>
+        </div>
+      </div>
+      <div class="two-column">
+        <div class="form-card">
+          <h3>Rooms</h3>
+          <p class="muted small">A room is a box's destination. Each room has its own ID prefix.</p>
+          <div id="room-list" class="settings-list"></div>
+          <form id="room-form" class="inline-form">
+            <label>New room name<input id="new-room-name" required placeholder="Workshop"></label>
+            <label>Box ID prefix<input id="new-room-prefix" required maxlength="5" placeholder="WRK"></label>
+            <button class="button button-primary" type="submit">Add Room</button>
+            <p id="room-error" class="error-message" role="alert"></p>
+          </form>
+        </div>
+        <div class="form-card">
+          <h3>Physical locations</h3>
+          <p class="muted small">A location is where a box physically is right now.</p>
+          <div id="location-list" class="settings-list"></div>
+          <form id="location-form" class="inline-form">
+            <label>New location<input id="new-location-name" required placeholder="Moving Truck"></label>
+            <button class="button button-primary" type="submit">Add Location</button>
+            <p id="location-error" class="error-message" role="alert"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="view" aria-labelledby="settings-title">
+      <div class="section-heading"><div><p class="eyebrow">HOUSEHOLD MANAGEMENT</p><h2 id="settings-title">Settings & Household</h2></div></div>
+      <div class="form-card settings-card">
+        <h3>Shared household ledger</h3>
+        <p class="muted small">This is the name your household members should look for. Everyone who belongs to this ledger sees the same boxes.</p>
+        <div class="ledger-identity"><span class="muted small">LEDGER NAME</span><strong id="settings-ledger-name">Loading…</strong><span class="muted small">LEDGER ID</span><code id="settings-ledger-id">—</code><button id="copy-ledger-details" class="button button-secondary" type="button">Copy ledger details</button></div>
+        <hr>
+        <h3>Your account</h3><p id="settings-account-email" class="account-email">—</p>
+        <button id="settings-signout" class="button button-secondary" type="button">Sign Out</button>
+        <hr>
+        <h3>Add a household member</h3>
+        <p class="muted small">Your wife should first create and verify her own Shack Out Back account, then sign in once. Enter the exact email she registered with below. This adds her to this existing ledger; she should not create a second household.</p>
+        <label>Household member's registered email<input id="settings-invite-email" type="email" placeholder="name@example.com" autocomplete="email"></label>
+        <button id="settings-invite-member" class="button button-primary" type="button">Add Member to This Ledger</button>
+        <p id="settings-invite-message" class="help-text" role="status"></p>
+        <p id="settings-error" class="error-message" role="alert"></p>
+      </div>
+    </section>
+    </div>
+  </main>
+
+  <dialog id="detail-dialog" class="detail-dialog">
+    <div id="detail-content"></div>
+  </dialog>
+
+  <dialog id="relocate-dialog" class="small-dialog">
+    <form id="relocate-form" method="dialog">
+      <p class="eyebrow">UPDATE PHYSICAL LOCATION</p>
+      <h2>Relocate box</h2>
+      <p id="relocate-box-label" class="muted"></p>
+      <label>New current location
+        <select id="relocate-location" required></select>
+      </label>
+      <label>Or add a new location
+        <input id="relocate-new-location" placeholder="Type a new location (optional)">
+      </label>
+      <div class="form-actions">
+        <button class="button button-secondary" value="cancel" type="button" data-close-dialog="relocate-dialog">Cancel</button>
+        <button class="button button-primary" type="submit">Confirm Relocation</button>
+      </div>
+      <p id="relocate-error" class="error-message" role="alert"></p>
+    </form>
+  </dialog>
+
+  <dialog id="label-dialog" class="label-dialog">
+    <div class="label-dialog-head">
+      <div>
+        <p class="eyebrow">LABEL COMPLETE</p>
+        <h2>Print box label</h2>
+      </div>
+      <button class="icon-button" data-close-dialog="label-dialog" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="label-preview-host"></div>
+    <label class="quantity-control">Number of copies
+      <div class="quantity-row">
+        <button id="quantity-minus" class="button button-secondary" type="button" aria-label="Decrease copies">−</button>
+        <output id="label-quantity">1</output>
+        <button id="quantity-plus" class="button button-secondary" type="button" aria-label="Increase copies">+</button>
+      </div>
+    </label>
+    <button id="print-labels" class="button button-primary full-width" type="button">PRINT 1 LABEL</button>
+    <p id="print-status" class="help-text" role="status" aria-live="polite">Ready to print directly to a compatible NIIMBOT printer. First use may ask you to select the printer.</p>
+  </dialog>
+
+  <dialog id="search-results-dialog" class="search-results-dialog">
+    <div class="dialog-inner">
+      <div class="dialog-head">
+        <div><p class="eyebrow">INVENTORY SEARCH</p><h2 id="search-results-title">Search results</h2></div>
+        <button class="icon-button" id="search-results-close" type="button" aria-label="Close search results">×</button>
+      </div>
+      <p id="search-results-summary" class="muted"></p>
+      <div id="search-results-list" class="search-results-list" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <dialog id="scanner-dialog" class="scanner-dialog">
+    <div class="dialog-inner">
+      <div class="dialog-head">
+        <div><p class="eyebrow">BOX LOOKUP</p><h2>Scan a box QR code</h2></div>
+        <button class="icon-button" id="scanner-close" type="button" aria-label="Close scanner">×</button>
+      </div>
+      <p class="muted small">Point the rear camera at a Shack Out Back box label. Scanning only looks up the box; it does not change its location.</p>
+      <div class="scanner-video-wrap">
+        <video id="scanner-video" autoplay muted playsinline aria-label="Live camera preview for QR scanning"></video>
+        <div class="scanner-guide" aria-hidden="true"></div>
+      </div>
+      <p id="scanner-status" class="status-banner" role="status" aria-live="polite">Camera has not started.</p>
+      <button id="scanner-start" class="button button-primary full-width" type="button">Start Camera</button>
+      <p class="help-text">Camera access requires permission. If prompted, allow camera access while using this site.</p>
+    </div>
+  </dialog>
+
+  <dialog id="import-dialog" class="small-dialog">
+    <form id="import-form" method="dialog">
+      <p class="eyebrow">RESTORE DATA</p>
+      <h2>Import inventory</h2>
+      <p class="muted">JSON export works for cloud inventory. Restoring a JSON backup into the shared database is intentionally disabled until the first two-account sync is tested, to avoid accidental duplicates or overwrites.</p>
+      <label>Choose JSON backup<input id="import-file" type="file" accept="application/json,.json" required></label>
+      <div class="form-actions">
+        <button class="button button-secondary" type="button" data-close-dialog="import-dialog">Cancel</button>
+        <button class="button button-primary" type="submit">Import JSON</button>
+      </div>
+      <p id="import-error" class="error-message" role="alert"></p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <footer class="app-footer">
+    <span>Shack Out Back</span>
+    <span id="footer-status">Shared inventory · beta</span>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/niimbot-web-bluetooth@2.6.0/src/niimbot.js"></script>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
