@@ -254,7 +254,7 @@ $("box-form").addEventListener("submit", async event => {
     const isNew = !input.id;
     const box = await store.saveBox(input);
     render(); showView("inventory"); toast(`${box.boxId} saved.`);
-    if (isNew) openLabel(box.id);
+    if (isNew) { resetForm(); openLabel(box.id); }
     else openDetail(box.id);
   } catch (error) { setFieldError("form-error", error.message); }
 });
