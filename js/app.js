@@ -1,4 +1,5 @@
-import { store, signIn, signUp, signOut, currentUser, authChanges, refreshInventory } from "./store.js";
+import { store, signIn, signOut, currentUser, authChanges, refreshInventory } from "./store.js";
+import { APP_ADMIN_EMAIL } from "./config.js";
 import { searchBoxes } from "./search.js";
 import { setupPrinting } from "./printing.js";
 import { downloadJson, renderPrintableInventory, downloadBlob } from "./exports.js";
@@ -64,6 +65,8 @@ function render() {
   if (ledgerId) ledgerId.textContent = s.inventoryId || "—";
   const accountEmail = $("settings-account-email");
   if (accountEmail) accountEmail.textContent = store.user?.email || "Signed-in account";
+  const adminPanel = $("app-invitation-admin");
+  if (adminPanel) adminPanel.classList.toggle("hidden", !store.user?.email || APP_ADMIN_EMAIL === "REPLACE_WITH_YOUR_ADMIN_EMAIL" || store.user.email.toLowerCase() !== APP_ADMIN_EMAIL.toLowerCase());
   populateSelect($("box-room"), s.rooms.map(r => ({id:r.id,name:`${r.name} (${r.prefix})`})));
   populateSelect($("box-location"), s.locations);
   populateSelect($("relocate-location"), s.locations);
@@ -560,11 +563,7 @@ $("auth-form").addEventListener("submit", async event => {
   try { const user = await signIn($("auth-email").value.trim(), $("auth-password").value); await updateAuthScreen(user); }
   catch (e) { $("auth-error").textContent = e.message; }
 });
-$("auth-signup").addEventListener("click", async () => {
-  $("auth-error").textContent = ""; $("auth-message").textContent = "";
-  try { const result = await signUp($("auth-email").value.trim(), $("auth-password").value); if (result.session && result.user) await updateAuthScreen(result.user); else $("auth-message").textContent = "Account created if the email is accepted. Check your inbox for Supabase's confirmation email, then sign in here."; }
-  catch (e) { $("auth-error").textContent = e.message; }
-});
+
 $("create-household").addEventListener("click", async () => {
   $("auth-error").textContent = "";
   try { await store.createHousehold($("household-name").value.trim() || "Shack Out Back Household"); toast("Household inventory created."); await updateAuthScreen(await currentUser()); }
@@ -592,6 +591,17 @@ $("settings-invite-member")?.addEventListener("click", async () => {
     $("settings-invite-email").value = "";
     toast("Household member added.");
   } catch (e) { $("settings-error").textContent = e.message; }
+});
+$("send-app-invite")?.addEventListener("click", async () => {
+  $("app-invite-error").textContent = ""; $("app-invite-message").textContent = "";
+  try {
+    const email = $("app-invite-email").value.trim();
+    if (!email) throw new Error("Enter the invitee's email address.");
+    if (!store.user?.email || APP_ADMIN_EMAIL === "REPLACE_WITH_YOUR_ADMIN_EMAIL" || store.user.email.toLowerCase() !== APP_ADMIN_EMAIL.toLowerCase()) throw new Error("This account is not configured as the app administrator.");
+    await store.inviteAppUser(email);
+    $("app-invite-message").textContent = `Invitation sent to ${email}. They can create an account from the email link; this does not grant access to your ledger.`;
+    $("app-invite-email").value = "";
+  } catch (e) { $("app-invite-error").textContent = e.message || "Could not send invitation."; }
 });
 $("settings-signout")?.addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("settings-error").textContent = e.message; } });
 authChanges(user => { updateAuthScreen(user); });

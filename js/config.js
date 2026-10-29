@@ -23,3 +23,6 @@ export const MAX_LABEL_COPIES = 20;
 // Supabase public browser configuration. Paste only your project URL and publishable key here.
 export const SUPABASE_URL = "https://ygzmzhaomvbgepayhxki.supabase.co";
 export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jx7zpCtHsWmHc5c6lhK82A_pHxg2yVg";
+
+// UI visibility only. The Edge Function independently enforces this address server-side. Replace before deployment.
+export const APP_ADMIN_EMAIL = "REPLACE_WITH_YOUR_ADMIN_EMAIL";

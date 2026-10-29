@@ -34,6 +34,7 @@ export const store = {
   async setUser(u){user=u; await refresh();},
   async createHousehold(name="Shack Out Back Household"){const {data,error}=await supabase.rpc("create_household_inventory",{inventory_name:name}); if(error) throw error; await refresh(); return data;},
   async inviteMember(email){const {error}=await supabase.rpc("add_household_member_by_email",{member_email:email}); if(error) throw error;},
+  async inviteAppUser(email){const {data,error}=await supabase.functions.invoke("send-app-invitation",{body:{email}});if(error)throw error;if(data?.error)throw new Error(data.error);return data;},
   async addRoom(name,prefix){const cleanName=name.trim(), cleanPrefix=prefix.trim().toUpperCase(); if(!cleanName||!/^[A-Z0-9]{2,5}$/.test(cleanPrefix))throw new Error("Use a 2–5 character prefix containing only letters and numbers."); const {error}=await supabase.from("rooms").insert({inventory_id:state.inventoryId,name:cleanName,prefix:cleanPrefix}); if(error)throw error; await refresh();},
   async addHandlingInstruction(name){const clean=String(name||"").trim();if(!clean)throw new Error("Enter an instruction.");if(clean.length>100)throw new Error("Instructions must be 100 characters or fewer.");if(state.customHandlingInstructions.some(v=>v.toLowerCase()===clean.toLowerCase()))return clean;const {error}=await supabase.from("handling_instruction_templates").insert({inventory_id:state.inventoryId,instruction:clean});if(error)throw error;await refresh();return clean;},
   async deleteHandlingInstruction(name){const clean=String(name||"").trim();if(!clean)throw new Error("Choose a saved instruction to delete.");const {error}=await supabase.from("handling_instruction_templates").delete().eq("inventory_id",state.inventoryId).eq("instruction",clean);if(error)throw error;await refresh();},
@@ -45,25 +46,6 @@ export const store = {
   async importReplace(){throw new Error("Cloud restore is not enabled in this first sync build. Keep your JSON backup safe; we'll add a guided importer after two-account sync is tested.");}
 };
 export async function signIn(email,password){const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;user=data.user;await refresh();return data.user;}
-export async function signUp(email, password) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo:
-        "https://jmanwit.github.io/Inventory_Management/"
-    }
-  });
-
-  if (error) throw error;
-
-  if (data.user && data.session) {
-    user = data.user;
-    await refresh();
-  }
-
-  return data;
-}
 export async function signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;user=null;await refresh();}
 export async function currentUser(){const {data,error}=await supabase.auth.getUser();if(error && error.name!=="AuthSessionMissingError")throw error;user=data?.user||null;return user;}
 export function authChanges(callback){return supabase.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;queueMicrotask(()=>callback(user));});}
