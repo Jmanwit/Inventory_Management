@@ -1,4 +1,4 @@
-const CACHE_NAME = "shack-out-back-shell-v10";
+const CACHE_NAME = "shack-out-back-shell-v11";
 const APP_SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./css/styles.css",
   "./vendor/qrcode.bundle.js", "./js/config.js", "./js/supabase-client.js", "./js/store.js", "./js/search.js", "./js/qr.js",
