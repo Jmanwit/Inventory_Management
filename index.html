@@ -16,6 +16,7 @@
       <p class="eyebrow">HOUSEHOLD INVENTORY</p>
       <h1>Shack Out Back</h1>
     </div>
+    <div id="active-ledger-control" class="active-ledger-control hidden"><label for="ledger-switcher">CURRENT LEDGER</label><select id="ledger-switcher" aria-label="Switch ledger"></select></div>
     <button id="menu-export" class="button button-quiet" type="button">Export</button>
   </header>
 
@@ -225,6 +226,14 @@
         <hr>
         <h3>Your account</h3><p id="settings-account-email" class="account-email">—</p>
         <button id="settings-signout" class="button button-secondary" type="button">Sign Out</button>
+        <hr>
+        <h3>Manage ledgers</h3>
+        <p class="muted small">Create a separate inventory for work, a workshop, or another household. Each ledger has its own rooms, boxes, locations, and numbering.</p>
+        <form id="new-ledger-form" class="inline-form">
+          <label>New ledger name<input id="new-ledger-name" type="text" maxlength="80" required placeholder="Workshop Inventory"></label>
+          <button class="button button-primary" type="submit">+ Create New Ledger</button>
+          <p id="new-ledger-error" class="error-message" role="alert"></p>
+        </form>
         <hr>
         <h3>Add a household member</h3>
         <p class="muted small">Your wife should first create and verify her own Shack Out Back account, then sign in once. Enter the exact email she registered with below. This adds her to this existing ledger; she should not create a second household.</p>
