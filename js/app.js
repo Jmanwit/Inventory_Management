@@ -44,6 +44,10 @@ function populateSelect(select, options, selectedId = null) {
 function render() {
   const s = store.snapshot();
   const boxes = s.boxes;
+  const ledgerControl = $("active-ledger-control");
+  if (ledgerControl) ledgerControl.classList.toggle("hidden", !store.user || !s.inventoryId);
+  const ledgerSelect = $("ledger-switcher");
+  if (ledgerSelect) { populateSelect(ledgerSelect, (s.ledgers || []).map(l => ({id:l.id,name:l.name})), s.inventoryId); ledgerSelect.value = s.inventoryId || ""; }
   $("result-count").textContent = `${boxes.length} box${boxes.length === 1 ? "" : "es"}`;
   $("summary-grid").innerHTML = `
     <div class="summary-card"><strong>${s.boxes.length}</strong><span>Total boxes</span></div>
@@ -165,7 +169,8 @@ function renderRoomsAndLocations(s) {
   $("room-list").replaceChildren();
   for (const room of s.rooms) {
     const row = document.createElement("div"); row.className = "settings-row";
-    row.innerHTML = `<span><strong>${escapeHtml(room.name)}</strong><small>Prefix: ${escapeHtml(room.prefix)}</small></span>`;
+    const count = s.boxes.filter(b => b.roomId === room.id).length;
+    row.innerHTML = `<span><strong>${escapeHtml(room.name)}</strong><small>Prefix: ${escapeHtml(room.prefix)} · ${count} box${count === 1 ? "" : "es"}</small></span><button class="button button-quiet room-delete-button" type="button" data-delete-room="${escapeHtml(room.id)}">Delete</button>`;
     $("room-list").append(row);
   }
   $("location-list").replaceChildren();
@@ -601,6 +606,44 @@ $("cancel-password-setup").addEventListener("click", async () => {
   passwordSetupActive = false; history.replaceState({}, "", location.pathname);
   passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
   await updateAuthScreen(await currentUser());
+});
+
+$("ledger-switcher")?.addEventListener("change", async event => {
+  try {
+    await store.switchLedger(event.target.value);
+    state.detailBoxId = null; state.labelBoxId = null; state.selectedHandling = [];
+    resetForm(); render();
+    $("sync-status").textContent = `Connected to ${store.snapshot().inventoryName}`;
+    $("footer-status").textContent = `Shared inventory · ${store.snapshot().inventoryName}`;
+    toast(`Switched to ${store.snapshot().inventoryName}.`);
+  } catch (error) { toast(`Could not switch ledger: ${error.message}`); render(); }
+});
+
+$("new-ledger-form")?.addEventListener("submit", async event => {
+  event.preventDefault(); $("new-ledger-error").textContent = "";
+  try {
+    const name = $("new-ledger-name").value.trim();
+    if (!name) throw new Error("Enter a name for the new ledger.");
+    await store.createHousehold(name);
+    $("new-ledger-form").reset(); render(); resetForm();
+    $("sync-status").textContent = `Connected to ${store.snapshot().inventoryName}`;
+    $("footer-status").textContent = `Shared inventory · ${store.snapshot().inventoryName}`;
+    toast(`Created and switched to ${store.snapshot().inventoryName}.`);
+  } catch (error) { $("new-ledger-error").textContent = error.message || "Could not create ledger."; }
+});
+
+$("room-list")?.addEventListener("click", async event => {
+  const button = event.target.closest("[data-delete-room]");
+  if (!button) return;
+  const room = store.rooms().find(r => r.id === button.dataset.deleteRoom);
+  if (!room) return;
+  const count = store.boxes().filter(b => b.roomId === room.id).length;
+  const message = count
+    ? `${room.name} has ${count} box${count === 1 ? "" : "es"} assigned to it. Move those boxes to another room before deleting this room.`
+    : `Delete the room “${room.name}”? This cannot be undone.`;
+  if (count || !confirm(message)) { if (count) toast(message); return; }
+  try { await store.deleteRoom(room.id); render(); toast(`Room ${room.name} deleted.`); }
+  catch (error) { toast(`Could not delete room: ${error.message}`); }
 });
 
 $("create-household").addEventListener("click", async () => {
