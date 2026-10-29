@@ -72,34 +72,92 @@ function render() {
 function renderHandlingOptions(s) {
   const host = $("handling-presets");
   if (!host) return;
-  const all = [...new Set([...STANDARD_HANDLING, ...(s.customHandlingInstructions || [])])];
+  const custom = s.customHandlingInstructions || [];
+  const customSet = new Set(custom.map(v => v.toLowerCase()));
+  const all = [...new Set([...STANDARD_HANDLING, ...custom])];
   host.replaceChildren();
   for (const instruction of all) {
+    const isCustom = customSet.has(instruction.toLowerCase());
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `handling-chip${state.selectedHandling.includes(instruction) ? " selected" : ""}`;
+    button.className = `handling-chip${state.selectedHandling.includes(instruction) ? " selected" : ""}${isCustom ? " custom-handling-chip" : ""}`;
     button.setAttribute("aria-pressed", String(state.selectedHandling.includes(instruction)));
     button.textContent = instruction;
-    button.addEventListener("click", () => {
-      state.selectedHandling = state.selectedHandling.includes(instruction)
-        ? state.selectedHandling.filter(v => v !== instruction)
-        : [...state.selectedHandling, instruction];
-      renderHandlingOptions(store.snapshot());
-    });
+    if (isCustom) {
+      button.title = "Tap to select. Press and hold to delete this saved instruction.";
+      button.setAttribute("aria-label", `${instruction}. Tap to select; press and hold to delete saved instruction.`);
+      let holdTimer = null;
+      let longPressTriggered = false;
+      const clearHold = () => { if (holdTimer) clearTimeout(holdTimer); holdTimer = null; };
+      const runDelete = () => {
+        if (longPressTriggered) return;
+        longPressTriggered = true;
+        clearHold();
+        void deleteCustomHandlingInstruction(instruction);
+        // Suppress the synthetic click some touch browsers send after a long press.
+        setTimeout(() => { longPressTriggered = false; }, 1200);
+      };
+      button.addEventListener("pointerdown", event => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        longPressTriggered = false;
+        holdTimer = setTimeout(runDelete, 650);
+      });
+      button.addEventListener("pointerup", clearHold);
+      button.addEventListener("pointercancel", clearHold);
+      button.addEventListener("pointerleave", clearHold);
+      button.addEventListener("contextmenu", event => { event.preventDefault(); runDelete(); });
+      button.addEventListener("click", () => {
+        if (longPressTriggered) return;
+        toggleHandlingInstruction(instruction);
+      });
+    } else {
+      button.addEventListener("click", () => toggleHandlingInstruction(instruction));
+    }
     host.append(button);
   }
   const selected = $("selected-handling");
   selected.replaceChildren();
   if (!state.selectedHandling.length) {
-    const empty = document.createElement("p"); empty.className = "muted small"; empty.textContent = "No quick instructions selected."; selected.append(empty); return;
+    const empty = document.createElement("p"); empty.className = "muted small"; empty.textContent = "No quick instructions selected."; selected.append(empty);
+  } else {
+    for (const instruction of state.selectedHandling) {
+      const chip = document.createElement("button"); chip.type = "button"; chip.className = "selected-handling-chip";
+      chip.textContent = `× ${instruction}`; chip.setAttribute("aria-label", `Remove ${instruction}`);
+      chip.addEventListener("click", () => { state.selectedHandling = state.selectedHandling.filter(v => v !== instruction); renderHandlingOptions(store.snapshot()); });
+      selected.append(chip);
+    }
   }
-  for (const instruction of state.selectedHandling) {
-    const chip = document.createElement("button"); chip.type = "button"; chip.className = "selected-handling-chip";
-    chip.textContent = `× ${instruction}`; chip.setAttribute("aria-label", `Remove ${instruction}`);
-    chip.addEventListener("click", () => { state.selectedHandling = state.selectedHandling.filter(v => v !== instruction); renderHandlingOptions(store.snapshot()); });
-    selected.append(chip);
+  updateHandlingCharacterCount();
+}
+function toggleHandlingInstruction(instruction) {
+  state.selectedHandling = state.selectedHandling.includes(instruction)
+    ? state.selectedHandling.filter(v => v !== instruction)
+    : [...state.selectedHandling, instruction];
+  renderHandlingOptions(store.snapshot());
+}
+async function deleteCustomHandlingInstruction(instruction) {
+  const ok = window.confirm(`Delete the saved quick instruction “${instruction}”?\n\nIt will be removed from the reusable buttons, but existing boxes that already use it will not be changed.`);
+  if (!ok) return;
+  try {
+    await store.deleteHandlingInstruction(instruction);
+    state.selectedHandling = state.selectedHandling.filter(v => v.toLowerCase() !== instruction.toLowerCase());
+    renderHandlingOptions(store.snapshot());
+    toast("Saved handling instruction deleted.");
+  } catch (error) {
+    toast(`Could not delete instruction: ${error.message || "Please try again."}`);
   }
 }
+function updateHandlingCharacterCount() {
+  const counter = $("handling-character-count");
+  if (!counter) return;
+  const notes = ($("box-notes")?.value || "").split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+  const text = [...new Set([...state.selectedHandling, ...notes])].join(" · ") || "NO SPECIAL HANDLING";
+  const count = text.length;
+  const max = 66; // Three printed lines at the current 22-character line-wrap target.
+  counter.textContent = `Label handling text: ${count}/${max} characters${count > max ? " — likely to be cut off on the printed label" : ""}`;
+  counter.classList.toggle("over-limit", count > max);
+}
+
 function renderRoomsAndLocations(s) {
   $("room-list").replaceChildren();
   for (const room of s.rooms) {
@@ -283,6 +341,7 @@ $("quick-add-location").addEventListener("click", async () => {
     toast(`Location ${location.name} added and selected.`);
   } catch (error) { setFieldError("quick-location-error", error.message); }
 });
+$("box-notes").addEventListener("input", updateHandlingCharacterCount);
 $("add-custom-instruction").addEventListener("click", async () => {
   setFieldError("handling-error", "");
   const value = $("custom-instruction-text").value.trim();
