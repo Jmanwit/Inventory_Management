@@ -1,5 +1,7 @@
+// Shack Out Back application-shell service worker.
+// IMPORTANT: This worker never reads, writes, or deletes application inventory data.
 const CACHE_PREFIX = "sob-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}v9`;
+const CACHE_NAME = `${CACHE_PREFIX}v10`;
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -22,27 +24,24 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      // Do not skipWaiting here. Existing users choose when to apply an update.
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    // Installation fails as a whole if any required shell asset is missing.
+    // The currently active worker remains in control until the user approves this update.
+    await cache.addAll(APP_SHELL);
+  })());
 });
 
 self.addEventListener("message", event => {
-  if (event.data && event.data.type === "SOB_SKIP_WAITING") {
+  if (event.data?.type === "SOB_SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
-    const keys = await caches.keys();
-    // Remove only caches created by Shack Out Back, including its known legacy names.
-    const owned = keys.filter(key =>
-      key.startsWith(CACHE_PREFIX) || key.startsWith("shack-out-back-shell-")
-    );
-    await Promise.all(owned.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)));
+    // Deliberately retain previous SOB shell caches. This preserves a rollback
+    // copy of the last application shell. No origin-wide cache cleanup occurs.
     await self.clients.claim();
   })());
 });
@@ -55,12 +54,11 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return;
   if (!url.href.startsWith(self.registration.scope)) return;
 
-  // Always check the network for page navigations so users don't stay on stale HTML.
   if (request.mode === "navigate") {
     event.respondWith((async () => {
       try {
         const response = await fetch(request);
-        if (response && response.ok) {
+        if (response?.ok) {
           const cache = await caches.open(CACHE_NAME);
           await cache.put("./index.html", response.clone());
         }
@@ -74,17 +72,14 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Versioned app assets are cached for offline use; the new worker has a new cache.
+  // App-shell assets use the version-specific cache. A new worker gets a new
+  // cache, so it cannot silently mix old and new JavaScript files.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) return cached;
-    try {
-      const response = await fetch(request);
-      if (response && response.ok) await cache.put(request, response.clone());
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await fetch(request);
+    if (response?.ok) await cache.put(request, response.clone());
+    return response;
   })());
 });
