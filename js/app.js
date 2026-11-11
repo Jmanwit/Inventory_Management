@@ -1,4 +1,4 @@
-import { store } from "./store.js";
+import { store, signIn, signUp, signOut, currentUser, authChanges, refreshInventory } from "./store.js";
 import { searchBoxes } from "./search.js";
 import { setupPrinting } from "./printing.js";
 import { downloadJson, renderPrintableInventory, downloadBlob } from "./exports.js";
@@ -6,7 +6,8 @@ import { downloadJson, renderPrintableInventory, downloadBlob } from "./exports.
 const $ = id => document.getElementById(id);
 const state = { activeView: "inventory", detailBoxId: null, labelBoxId: null, selectedHandling: [] };
 const STANDARD_HANDLING = ["Fragile", "Keep Upright", "Heavy", "Do Not Stack", "This Side Up", "Keep Dry", "Handle With Care", "Two-Person Lift", "Keep Accessible", "Sharp Objects", "Temperature Sensitive", "Do Not Crush"];
-store.init();
+// Cloud auth initializes below; do not show local-only data before sign-in.
+
 
 const labelDialog = $("label-dialog");
 const printer = setupPrinting({
@@ -41,7 +42,7 @@ function populateSelect(select, options, selectedId = null) {
 }
 function render() {
   const s = store.snapshot();
-  const boxes = searchBoxes(s.boxes, $("search-input").value);
+  const boxes = s.boxes;
   $("result-count").textContent = `${boxes.length} box${boxes.length === 1 ? "" : "es"}`;
   $("summary-grid").innerHTML = `
     <div class="summary-card"><strong>${s.boxes.length}</strong><span>Total boxes</span></div>
@@ -55,13 +56,14 @@ function render() {
     button.addEventListener("click", () => openDetail(box.id));
     $("box-list").append(button);
   }
-  $("empty-state").classList.toggle("hidden", s.boxes.length > 0 || $("search-input").value.trim().length > 0);
-  if (s.boxes.length && boxes.length === 0) {
-    const empty = document.createElement("div"); empty.className = "empty-state";
-    empty.innerHTML = "<h3>No matching boxes</h3><p>Try another item, box ID, room, or location.</p>";
-    $("box-list").append(empty);
-  }
+  $("empty-state").classList.toggle("hidden", s.boxes.length > 0);
   renderRoomsAndLocations(s);
+  const ledgerName = $("settings-ledger-name");
+  if (ledgerName) ledgerName.textContent = s.inventoryName || "Household Inventory";
+  const ledgerId = $("settings-ledger-id");
+  if (ledgerId) ledgerId.textContent = s.inventoryId || "—";
+  const accountEmail = $("settings-account-email");
+  if (accountEmail) accountEmail.textContent = store.user?.email || "Signed-in account";
   populateSelect($("box-room"), s.rooms.map(r => ({id:r.id,name:`${r.name} (${r.prefix})`})));
   populateSelect($("box-location"), s.locations);
   populateSelect($("relocate-location"), s.locations);
@@ -175,7 +177,7 @@ function openLabel(id) {
   state.labelBoxId = id; printer.show(box); labelDialog.showModal();
 }
 function setFieldError(id, message) { $(id).textContent = message; }
-document.addEventListener("click", event => {
+document.addEventListener("click", async event => {
   const target = event.target.closest("button");
   if (!target) return;
   if (target.dataset.view) showView(target.dataset.view);
@@ -187,12 +189,58 @@ document.addEventListener("click", event => {
   if (target.dataset.delete) {
     const box = store.getBox(target.dataset.delete);
     if (box && confirm(`Permanently delete ${box.boxId} — ${box.description}?\n\nIts ID will not be reused.`)) {
-      store.deleteBox(box.id); $("detail-dialog").close(); render(); toast(`${box.boxId} deleted. Its ID will not be reused.`);
+      await store.deleteBox(box.id); $("detail-dialog").close(); render(); toast(`${box.boxId} deleted. Its ID will not be reused.`);
     }
   }
 });
-$("search-input").addEventListener("input", render);
-$("box-form").addEventListener("submit", event => {
+function highlightMatch(value, query) {
+  const text = String(value ?? "");
+  const q = query.trim();
+  if (!q) return escapeHtml(text);
+  const lower = text.toLocaleLowerCase();
+  const needle = q.toLocaleLowerCase();
+  let result = "", from = 0, index;
+  while ((index = lower.indexOf(needle, from)) !== -1) {
+    result += escapeHtml(text.slice(from, index));
+    result += `<mark class="search-highlight">${escapeHtml(text.slice(index, index + q.length))}</mark>`;
+    from = index + q.length;
+  }
+  return result + escapeHtml(text.slice(from));
+}
+
+function openSearchResults(query) {
+  const q = query.trim();
+  if (!q) { toast("Enter an item, box name, ID, room, or location to search."); $("search-input").focus(); return; }
+  const matches = searchBoxes(store.snapshot().boxes, q).sort((a, b) => a.boxId.localeCompare(b.boxId, undefined, { numeric: true }));
+  $("search-results-title").textContent = `Results for “${q}”`;
+  $("search-results-summary").textContent = `${matches.length} matching box${matches.length === 1 ? "" : "es"}. Choose a box to view its full record.`;
+  const host = $("search-results-list"); host.replaceChildren();
+  if (!matches.length) {
+    const empty = document.createElement("div"); empty.className = "search-no-results";
+    empty.innerHTML = `<h3>No matching boxes</h3><p>Nothing matched <strong>${escapeHtml(q)}</strong>. Try a shorter term or a different spelling.</p>`;
+    host.append(empty);
+  }
+  for (const box of matches) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "search-result-card";
+    const matchingItems = (box.items || []).filter(item => item.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
+    const matchingFields = [];
+    if (box.description.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>BOX NAME</span> ${highlightMatch(box.description, q)}</p>`);
+    if (matchingItems.length) matchingFields.push(`<p class="search-match-line"><span>MATCHING CONTENT${matchingItems.length === 1 ? "" : "S"}</span> ${matchingItems.map(item => highlightMatch(item, q)).join(" · ")}</p>`);
+    if (box.boxId.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>BOX ID</span> ${highlightMatch(box.boxId, q)}</p>`);
+    if (box.destination.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>DESTINATION</span> ${highlightMatch(box.destination, q)}</p>`);
+    if (box.currentLocation.toLocaleLowerCase().includes(q.toLocaleLowerCase())) matchingFields.push(`<p class="search-match-line"><span>CURRENT LOCATION</span> ${highlightMatch(box.currentLocation, q)}</p>`);
+    if (!matchingFields.length) matchingFields.push(`<p class="search-match-line">Contains “${escapeHtml(q)}” in notes or other box details.</p>`);
+    button.innerHTML = `<span class="box-id-badge">${escapeHtml(box.boxId)}</span><span class="search-result-copy"><strong>${highlightMatch(box.description, q)}</strong><small>${escapeHtml(box.destination)} · ${box.items.length} item${box.items.length === 1 ? "" : "s"}</small>${matchingFields.join("")}<span class="location-chip">Current location: ${escapeHtml(box.currentLocation)}</span></span><span class="search-result-arrow" aria-hidden="true">›</span>`;
+    button.addEventListener("click", () => { $("search-results-dialog").close(); openDetail(box.id); });
+    host.append(button);
+  }
+  $("search-results-dialog").showModal();
+}
+
+$("search-form").addEventListener("submit", event => { event.preventDefault(); openSearchResults($("search-input").value); });
+$("search-results-close").addEventListener("click", () => $("search-results-dialog").close());
+$("search-results-dialog").addEventListener("close", () => { if (state.activeView === "inventory") $("search-input").focus({ preventScroll: true }); });
+$("box-form").addEventListener("submit", async event => {
   event.preventDefault(); setFieldError("form-error", "");
   try {
     const input = {
@@ -204,19 +252,19 @@ $("box-form").addEventListener("submit", event => {
       handlingInstructions: [...state.selectedHandling]
     };
     const isNew = !input.id;
-    const box = store.saveBox(input);
+    const box = await store.saveBox(input);
     render(); showView("inventory"); toast(`${box.boxId} saved.`);
     if (isNew) openLabel(box.id);
     else openDetail(box.id);
   } catch (error) { setFieldError("form-error", error.message); }
 });
 $("cancel-edit").addEventListener("click", () => { resetForm(); showView("inventory"); });
-$("quick-add-room").addEventListener("click", () => {
+$("quick-add-room").addEventListener("click", async () => {
   setFieldError("quick-room-error", "");
   try {
     const name = $("quick-room-name").value;
     const prefix = $("quick-room-prefix").value;
-    store.addRoom(name, prefix);
+    await store.addRoom(name, prefix);
     const room = store.rooms().find(r => r.name.toLowerCase() === name.trim().toLowerCase());
     render(); if (room) $("box-room").value = room.id;
     $("quick-room-name").value = ""; $("quick-room-prefix").value = "";
@@ -224,51 +272,51 @@ $("quick-add-room").addEventListener("click", () => {
     toast(`Room ${room?.name || name} added and selected.`);
   } catch (error) { setFieldError("quick-room-error", error.message); }
 });
-$("quick-add-location").addEventListener("click", () => {
+$("quick-add-location").addEventListener("click", async () => {
   setFieldError("quick-location-error", "");
   try {
     const name = $("quick-location-name").value;
-    const location = store.addLocation(name);
+    const location = await store.addLocation(name);
     render(); $("box-location").value = location.id;
     $("quick-location-name").value = "";
     $("quick-location-name").closest("details").open = false;
     toast(`Location ${location.name} added and selected.`);
   } catch (error) { setFieldError("quick-location-error", error.message); }
 });
-$("add-custom-instruction").addEventListener("click", () => {
+$("add-custom-instruction").addEventListener("click", async () => {
   setFieldError("handling-error", "");
   const value = $("custom-instruction-text").value.trim();
   if (!value) { setFieldError("handling-error", "Type an instruction first."); return; }
   try {
     let instruction = value;
-    if ($("save-custom-instruction").checked) instruction = store.addHandlingInstruction(value);
+    if ($("save-custom-instruction").checked) instruction = await store.addHandlingInstruction(value);
     if (!state.selectedHandling.some(v => v.toLowerCase() === instruction.toLowerCase())) state.selectedHandling.push(instruction);
     $("custom-instruction-text").value = "";
     renderHandlingOptions(store.snapshot());
     toast($("save-custom-instruction").checked ? "Instruction saved for reuse and selected." : "One-off instruction selected.");
   } catch (error) { setFieldError("handling-error", error.message); }
 });
-$("room-form").addEventListener("submit", event => {
+$("room-form").addEventListener("submit", async event => {
   event.preventDefault(); setFieldError("room-error", "");
   try {
-    store.addRoom($("new-room-name").value, $("new-room-prefix").value);
+    await store.addRoom($("new-room-name").value, $("new-room-prefix").value);
     $("room-form").reset(); render(); toast("Room added.");
   } catch (error) { setFieldError("room-error", error.message); }
 });
-$("location-form").addEventListener("submit", event => {
+$("location-form").addEventListener("submit", async event => {
   event.preventDefault(); setFieldError("location-error", "");
   try {
-    store.addLocation($("new-location-name").value);
+    await store.addLocation($("new-location-name").value);
     $("location-form").reset(); render(); toast("Location added.");
   } catch (error) { setFieldError("location-error", error.message); }
 });
-$("relocate-form").addEventListener("submit", event => {
+$("relocate-form").addEventListener("submit", async event => {
   event.preventDefault(); setFieldError("relocate-error", "");
   try {
     const typed = $("relocate-new-location").value.trim();
     const chosen = $("relocate-location").selectedOptions[0]?.textContent || "";
     const destination = typed || chosen;
-    const result = store.relocateBox($("relocate-dialog").dataset.boxId, destination);
+    const result = await store.relocateBox($("relocate-dialog").dataset.boxId, destination);
     $("relocate-dialog").close(); render();
     toast(`${result.box.boxId} relocated: ${result.previousLocation} → ${result.box.currentLocation}`);
   } catch (error) { setFieldError("relocate-error", error.message); }
@@ -287,8 +335,8 @@ $("import-form").addEventListener("submit", async event => {
   try {
     const file = $("import-file").files[0]; if (!file) throw new Error("Choose a JSON file.");
     const parsed = JSON.parse(await file.text());
-    if (!confirm("This replaces the local inventory on this device. Export a backup first. Continue?")) return;
-    store.importReplace(parsed); $("import-dialog").close(); render(); toast("Local inventory imported.");
+    if (!confirm("Cloud restore is not enabled in this first sync build. The file will NOT be imported. Continue to see the current restore status?")) return;
+    await store.importReplace(parsed);
   } catch (error) { setFieldError("import-error", error.message); }
 });
 document.addEventListener("change", event => {
@@ -297,6 +345,122 @@ document.addEventListener("change", event => {
     if (room && !$("box-description").value) $("box-description").placeholder = `e.g. ${room.name} supplies`;
   }
 });
+
+// In-app QR scanning uses the browser's native BarcodeDetector API. This keeps
+// the scanner local/offline-capable without loading camera or QR services from a CDN.
+const scannerDialog = $("scanner-dialog");
+const scannerVideo = $("scanner-video");
+const scannerStatus = $("scanner-status");
+let scannerStream = null;
+let scannerFrame = null;
+let scannerRunning = false;
+let scannerDetector = null;
+
+function stopScanner() {
+  scannerRunning = false;
+  if (scannerFrame !== null) cancelAnimationFrame(scannerFrame);
+  scannerFrame = null;
+  if (scannerStream) scannerStream.getTracks().forEach(track => track.stop());
+  scannerStream = null;
+  if (scannerVideo) scannerVideo.srcObject = null;
+}
+function scannedBoxId(rawValue) {
+  try {
+    const parsed = new URL(rawValue, window.location.href);
+    const match = parsed.hash.match(/(?:^#|[&#])box=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  } catch {}
+  // Also accept a bare stable UUID if a future label format uses one.
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(rawValue).trim())) return String(rawValue).trim();
+  return null;
+}
+async function handleScannedValue(rawValue) {
+  const id = scannedBoxId(rawValue);
+  if (!id) {
+    scannerStatus.textContent = "That QR code isn't a Shack Out Back box label. Keep scanning or try another code.";
+    return false;
+  }
+  stopScanner();
+  scannerStatus.textContent = "QR recognized. Looking up the box in your shared inventory…";
+  try {
+    await refreshInventory();
+    const box = store.getBox(id);
+    scannerDialog.close();
+    if (!box) {
+      toast("That box wasn't found in the current shared inventory.");
+      return true;
+    }
+    showView("inventory");
+    openDetail(box.id);
+    toast(`Found ${box.boxId}.`);
+  } catch (error) {
+    scannerStatus.textContent = `Couldn't look up this box: ${error.message}`;
+    if (!scannerDialog.open) scannerDialog.showModal();
+  }
+  return true;
+}
+async function scanFrame() {
+  if (!scannerRunning || !scannerDetector || !scannerVideo) return;
+  try {
+    if (scannerVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      const codes = await scannerDetector.detect(scannerVideo);
+      if (codes.length) {
+        const found = await handleScannedValue(codes[0].rawValue);
+        if (found) return;
+      }
+    }
+  } catch (error) {
+    console.warn("QR scan frame failed", error);
+  }
+  if (scannerRunning) scannerFrame = requestAnimationFrame(scanFrame);
+}
+$("scan-box-button").addEventListener("click", () => {
+  scannerStatus.textContent = "Ready to start the camera.";
+  $("scanner-start").classList.remove("hidden");
+  scannerDialog.showModal();
+});
+$("scanner-close").addEventListener("click", () => {
+  stopScanner();
+  scannerDialog.close();
+});
+scannerDialog.addEventListener("cancel", stopScanner);
+scannerDialog.addEventListener("close", stopScanner);
+$("scanner-start").addEventListener("click", async () => {
+  scannerStatus.textContent = "";
+  if (!("BarcodeDetector" in window)) {
+    scannerStatus.textContent = "QR scanning isn't supported by this browser. Try the latest Chrome on Android, then reopen Shack Out Back.";
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    scannerStatus.textContent = "Camera access isn't available. Open Shack Out Back from its HTTPS GitHub Pages address.";
+    return;
+  }
+  try {
+    const supported = await window.BarcodeDetector.getSupportedFormats?.();
+    if (supported && !supported.includes("qr_code")) {
+      scannerStatus.textContent = "This browser's camera scanner doesn't support QR codes.";
+      return;
+    }
+    scannerDetector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    scannerVideo.srcObject = scannerStream;
+    await scannerVideo.play();
+    scannerRunning = true;
+    $("scanner-start").classList.add("hidden");
+    scannerStatus.textContent = "Camera is on. Hold the QR code inside the frame.";
+    scannerFrame = requestAnimationFrame(scanFrame);
+  } catch (error) {
+    stopScanner();
+    scannerStatus.textContent = error.name === "NotAllowedError"
+      ? "Camera permission was denied. Allow camera access in your browser's site settings, then try again."
+      : `Couldn't start the camera: ${error.message || error.name}. Check camera permission and close other camera apps.`;
+    $("scanner-start").classList.remove("hidden");
+  }
+});
+
 window.addEventListener("hashchange", () => {
   const match = location.hash.match(/box=([^&]+)/);
   if (match) {
@@ -305,11 +469,75 @@ window.addEventListener("hashchange", () => {
     else toast("This box is not in the local inventory on this device.");
   }
 });
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service worker registration failed", err)));
-}
 store.subscribe(render);
-render();
+
+function setWorkspaceVisible(visible) {
+  $("workspace").classList.toggle("hidden", !visible);
+  $("auth-panel").classList.toggle("hidden", visible);
+}
+async function updateAuthScreen(user) {
+  const householdSetup = $("household-setup"), invite = $("household-invite"), tools = $("signed-in-tools");
+  $("auth-error").textContent = ""; $("auth-message").textContent = "";
+  if (!user) {
+    setWorkspaceVisible(false); householdSetup.classList.add("hidden"); invite.classList.add("hidden"); tools.classList.add("hidden");
+    $("auth-email").disabled = false; $("auth-password").disabled = false; return;
+  }
+  $("auth-email").disabled = true; $("auth-password").disabled = true;
+  $("signed-in-label").textContent = `Signed in as ${user.email || user.id}`; tools.classList.remove("hidden");
+  try {
+    await refreshInventory();
+    const hasInventory = !!store.snapshot().inventoryId;
+    householdSetup.classList.toggle("hidden", hasInventory); invite.classList.toggle("hidden", !hasInventory);
+    setWorkspaceVisible(hasInventory);
+    if (hasInventory) { $("sync-status").textContent = "Connected to shared household inventory"; $("footer-status").textContent = "Shared inventory · connected"; render(); handleBoxHash(); }
+    else { $("auth-message").textContent = "You're signed in, but this account isn't part of a household inventory yet."; }
+  } catch (e) { setWorkspaceVisible(false); $("auth-error").textContent = `Could not load shared inventory: ${e.message}`; }
+}
+$("auth-form").addEventListener("submit", async event => {
+  event.preventDefault(); $("auth-error").textContent = ""; $("auth-message").textContent = "";
+  try { const user = await signIn($("auth-email").value.trim(), $("auth-password").value); await updateAuthScreen(user); }
+  catch (e) { $("auth-error").textContent = e.message; }
+});
+$("auth-signup").addEventListener("click", async () => {
+  $("auth-error").textContent = ""; $("auth-message").textContent = "";
+  try { const result = await signUp($("auth-email").value.trim(), $("auth-password").value); if (result.session && result.user) await updateAuthScreen(result.user); else $("auth-message").textContent = "Account created if the email is accepted. Check your inbox for Supabase's confirmation email, then sign in here."; }
+  catch (e) { $("auth-error").textContent = e.message; }
+});
+$("create-household").addEventListener("click", async () => {
+  $("auth-error").textContent = "";
+  try { await store.createHousehold($("household-name").value.trim() || "Shack Out Back Household"); toast("Household inventory created."); await updateAuthScreen(await currentUser()); }
+  catch (e) { $("auth-error").textContent = e.message; }
+});
+$("invite-member").addEventListener("click", async () => {
+  $("invite-message").textContent = ""; $("auth-error").textContent = "";
+  try { const email=$("invite-email").value.trim(); if(!email) throw new Error("Enter the email address your wife used to register."); await store.inviteMember(email); $("invite-message").textContent = "Household membership added. Have her sign in on her phone and refresh the app."; toast("Household member added."); }
+  catch(e) { $("auth-error").textContent = e.message; }
+});
+$("auth-signout").addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("auth-error").textContent=e.message; } });
+$("copy-ledger-details")?.addEventListener("click", async () => {
+  const s = store.snapshot();
+  const details = `Shack Out Back ledger: ${s.inventoryName || "Household Inventory"}\nLedger ID: ${s.inventoryId || "—"}`;
+  try { await navigator.clipboard.writeText(details); toast("Ledger name and ID copied."); }
+  catch { prompt("Copy these ledger details:", details); }
+});
+$("settings-invite-member")?.addEventListener("click", async () => {
+  $("settings-error").textContent = ""; $("settings-invite-message").textContent = "";
+  try {
+    const email = $("settings-invite-email").value.trim();
+    if (!email) throw new Error("Enter the email address the member used to register.");
+    await store.inviteMember(email);
+    $("settings-invite-message").textContent = "Member added to this ledger. Have them sign in or refresh Shack Out Back.";
+    $("settings-invite-email").value = "";
+    toast("Household member added.");
+  } catch (e) { $("settings-error").textContent = e.message; }
+});
+$("settings-signout")?.addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("settings-error").textContent = e.message; } });
+authChanges(user => { updateAuthScreen(user); });
+window.addEventListener("focus", async () => { if (store.user && store.snapshot().inventoryId) { try { await refreshInventory(); render(); } catch (e) { $("sync-status").textContent = `Sync issue: ${e.message}`; } } });
+(async () => {
+  try { const user = await currentUser(); await store.init(); await updateAuthScreen(user); }
+  catch (e) { setWorkspaceVisible(false); $("auth-error").textContent = `Setup needed: ${e.message}`; }
+})();
 function handleBoxHash() {
   const match = location.hash.match(/box=([^&]+)/);
   if (!match) return;
