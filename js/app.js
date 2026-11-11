@@ -536,7 +536,7 @@ window.addEventListener("hashchange", () => {
     else toast("This box is not in the local inventory on this device.");
   }
 });
-// Service-worker registration and user-approved updates are handled only by js/pwa.js.
+// Service-worker registration and update handling live in ./pwa.js only.
 store.subscribe(render);
 
 function setWorkspaceVisible(visible) {
