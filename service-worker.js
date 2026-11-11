@@ -24,9 +24,9 @@ const APP_SHELL = [
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // Atomic core-shell install: an incomplete deployment must not replace the working app.
+    // Install the shell atomically. A missing asset prevents a partial update.
     await cache.addAll(APP_SHELL);
-    // Do not skipWaiting here. The user approves updates in pwa.js.
+    // Deliberately do not call skipWaiting here; the user approves activation.
   })());
 });
 
@@ -34,21 +34,17 @@ self.addEventListener("message", event => {
   if (event.data?.type === "SOB_SKIP_WAITING") self.skipWaiting();
 });
 
-self.addEventListener("activate", event => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    const owned = keys.filter(key =>
-      key.startsWith(CACHE_PREFIX) || key.startsWith("shack-out-back-shell-")
-    );
-    // Retain the active shell and two previous SOB shells for rollback/recovery.
-    const numbered = owned
-      .map(key => ({ key, version: Number(key.match(/(?:sob-shell-|shack-out-back-shell-)v?(\d+)$/)?.[1] ?? -1) }))
-      .sort((a, b) => b.version - a.version);
-    const keep = new Set([CACHE_NAME, ...numbered.filter(x => x.key !== CACHE_NAME).slice(0, 2).map(x => x.key)]);
-    await Promise.all(owned.filter(key => !keep.has(key)).map(key => caches.delete(key)));
-    await self.clients.claim();
-  })());
-});
+self.addEventListener("activate", event => event.waitUntil((async () => {
+  const keys = (await caches.keys()).filter(key => key.startsWith(CACHE_PREFIX)).sort((a, b) => {
+    const av = Number(a.slice(CACHE_PREFIX.length));
+    const bv = Number(b.slice(CACHE_PREFIX.length));
+    return av - bv;
+  });
+  // Retain the active shell and two prior SOB shells for recovery.
+  const obsolete = keys.filter(key => key !== CACHE_NAME).slice(0, Math.max(0, keys.length - 3));
+  await Promise.all(obsolete.map(key => caches.delete(key)));
+  await self.clients.claim();
+})()));
 
 self.addEventListener("fetch", event => {
   const request = event.request;
@@ -56,6 +52,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || !url.href.startsWith(self.registration.scope)) return;
 
+  // Always revalidate navigations; fall back to the cached app shell if offline.
   if (request.mode === "navigate") {
     event.respondWith((async () => {
       try {
@@ -66,16 +63,15 @@ self.addEventListener("fetch", event => {
         }
         return response;
       } catch (error) {
-        const cached = await caches.open(CACHE_NAME);
-        const shell = await cached.match("./index.html");
-        if (shell) return shell;
+        const cached = await caches.match("./index.html");
+        if (cached) return cached;
         throw error;
       }
     })());
     return;
   }
 
-  // Cache-first for same-origin shell assets. A newly activated worker has its own versioned cache.
+  // Same-origin application assets use this version's cache first.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
