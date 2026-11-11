@@ -1,5 +1,3 @@
-// Shack Out Back application-shell service worker.
-// IMPORTANT: This worker never reads, writes, or deletes application inventory data.
 const CACHE_PREFIX = "sob-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}v10`;
 const APP_SHELL = [
@@ -26,22 +24,28 @@ const APP_SHELL = [
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // Installation fails as a whole if any required shell asset is missing.
-    // The currently active worker remains in control until the user approves this update.
+    // Atomic core-shell install: an incomplete deployment must not replace the working app.
     await cache.addAll(APP_SHELL);
+    // Do not skipWaiting here. The user approves updates in pwa.js.
   })());
 });
 
 self.addEventListener("message", event => {
-  if (event.data?.type === "SOB_SKIP_WAITING") {
-    self.skipWaiting();
-  }
+  if (event.data?.type === "SOB_SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
-    // Deliberately retain previous SOB shell caches. This preserves a rollback
-    // copy of the last application shell. No origin-wide cache cleanup occurs.
+    const keys = await caches.keys();
+    const owned = keys.filter(key =>
+      key.startsWith(CACHE_PREFIX) || key.startsWith("shack-out-back-shell-")
+    );
+    // Retain the active shell and two previous SOB shells for rollback/recovery.
+    const numbered = owned
+      .map(key => ({ key, version: Number(key.match(/(?:sob-shell-|shack-out-back-shell-)v?(\d+)$/)?.[1] ?? -1) }))
+      .sort((a, b) => b.version - a.version);
+    const keep = new Set([CACHE_NAME, ...numbered.filter(x => x.key !== CACHE_NAME).slice(0, 2).map(x => x.key)]);
+    await Promise.all(owned.filter(key => !keep.has(key)).map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -49,10 +53,8 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
-
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (!url.href.startsWith(self.registration.scope)) return;
+  if (url.origin !== self.location.origin || !url.href.startsWith(self.registration.scope)) return;
 
   if (request.mode === "navigate") {
     event.respondWith((async () => {
@@ -64,22 +66,22 @@ self.addEventListener("fetch", event => {
         }
         return response;
       } catch (error) {
-        const cached = await caches.match("./index.html");
-        if (cached) return cached;
+        const cached = await caches.open(CACHE_NAME);
+        const shell = await cached.match("./index.html");
+        if (shell) return shell;
         throw error;
       }
     })());
     return;
   }
 
-  // App-shell assets use the version-specific cache. A new worker gets a new
-  // cache, so it cannot silently mix old and new JavaScript files.
+  // Cache-first for same-origin shell assets. A newly activated worker has its own versioned cache.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) return cached;
     const response = await fetch(request);
-    if (response?.ok) await cache.put(request, response.clone());
+    if (response?.ok && response.type !== "opaque") await cache.put(request, response.clone());
     return response;
   })());
 });
