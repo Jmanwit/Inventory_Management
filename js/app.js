@@ -536,9 +536,7 @@ window.addEventListener("hashchange", () => {
     else toast("This box is not in the local inventory on this device.");
   }
 });
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service worker registration failed", err)));
-}
+// Service-worker registration and user-approved updates are handled only by js/pwa.js.
 store.subscribe(render);
 
 function setWorkspaceVisible(visible) {
