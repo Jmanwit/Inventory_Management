@@ -1,5 +1,4 @@
-import { store, signIn, signOut, currentUser, authChanges, refreshInventory, setPassword, requestPasswordReset } from "./store.js";
-import { APP_ADMIN_EMAIL } from "./config.js";
+import { store, signIn, signUp, signOut, currentUser, authChanges, refreshInventory } from "./store.js";
 import { searchBoxes } from "./search.js";
 import { setupPrinting } from "./printing.js";
 import { downloadJson, renderPrintableInventory, downloadBlob } from "./exports.js";
@@ -44,10 +43,6 @@ function populateSelect(select, options, selectedId = null) {
 function render() {
   const s = store.snapshot();
   const boxes = s.boxes;
-  const ledgerControl = $("active-ledger-control");
-  if (ledgerControl) ledgerControl.classList.toggle("hidden", !store.user || !s.inventoryId);
-  const ledgerSelect = $("ledger-switcher");
-  if (ledgerSelect) { populateSelect(ledgerSelect, (s.ledgers || []).map(l => ({id:l.id,name:l.name})), s.inventoryId); ledgerSelect.value = s.inventoryId || ""; }
   $("result-count").textContent = `${boxes.length} box${boxes.length === 1 ? "" : "es"}`;
   $("summary-grid").innerHTML = `
     <div class="summary-card"><strong>${s.boxes.length}</strong><span>Total boxes</span></div>
@@ -69,8 +64,6 @@ function render() {
   if (ledgerId) ledgerId.textContent = s.inventoryId || "—";
   const accountEmail = $("settings-account-email");
   if (accountEmail) accountEmail.textContent = store.user?.email || "Signed-in account";
-  const adminPanel = $("app-invitation-admin");
-  if (adminPanel) adminPanel.classList.toggle("hidden", !store.user?.email || APP_ADMIN_EMAIL === "REPLACE_WITH_YOUR_ADMIN_EMAIL" || store.user.email.toLowerCase() !== APP_ADMIN_EMAIL.toLowerCase());
   populateSelect($("box-room"), s.rooms.map(r => ({id:r.id,name:`${r.name} (${r.prefix})`})));
   populateSelect($("box-location"), s.locations);
   populateSelect($("relocate-location"), s.locations);
@@ -79,98 +72,39 @@ function render() {
 function renderHandlingOptions(s) {
   const host = $("handling-presets");
   if (!host) return;
-  const custom = s.customHandlingInstructions || [];
-  const customSet = new Set(custom.map(v => v.toLowerCase()));
-  const all = [...new Set([...STANDARD_HANDLING, ...custom])];
+  const all = [...new Set([...STANDARD_HANDLING, ...(s.customHandlingInstructions || [])])];
   host.replaceChildren();
   for (const instruction of all) {
-    const isCustom = customSet.has(instruction.toLowerCase());
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `handling-chip${state.selectedHandling.includes(instruction) ? " selected" : ""}${isCustom ? " custom-handling-chip" : ""}`;
+    button.className = `handling-chip${state.selectedHandling.includes(instruction) ? " selected" : ""}`;
     button.setAttribute("aria-pressed", String(state.selectedHandling.includes(instruction)));
     button.textContent = instruction;
-    if (isCustom) {
-      button.title = "Tap to select. Press and hold to delete this saved instruction.";
-      button.setAttribute("aria-label", `${instruction}. Tap to select; press and hold to delete saved instruction.`);
-      let holdTimer = null;
-      let longPressTriggered = false;
-      const clearHold = () => { if (holdTimer) clearTimeout(holdTimer); holdTimer = null; };
-      const runDelete = () => {
-        if (longPressTriggered) return;
-        longPressTriggered = true;
-        clearHold();
-        void deleteCustomHandlingInstruction(instruction);
-        // Suppress the synthetic click some touch browsers send after a long press.
-        setTimeout(() => { longPressTriggered = false; }, 1200);
-      };
-      button.addEventListener("pointerdown", event => {
-        if (event.pointerType === "mouse" && event.button !== 0) return;
-        longPressTriggered = false;
-        holdTimer = setTimeout(runDelete, 650);
-      });
-      button.addEventListener("pointerup", clearHold);
-      button.addEventListener("pointercancel", clearHold);
-      button.addEventListener("pointerleave", clearHold);
-      button.addEventListener("contextmenu", event => { event.preventDefault(); runDelete(); });
-      button.addEventListener("click", () => {
-        if (longPressTriggered) return;
-        toggleHandlingInstruction(instruction);
-      });
-    } else {
-      button.addEventListener("click", () => toggleHandlingInstruction(instruction));
-    }
+    button.addEventListener("click", () => {
+      state.selectedHandling = state.selectedHandling.includes(instruction)
+        ? state.selectedHandling.filter(v => v !== instruction)
+        : [...state.selectedHandling, instruction];
+      renderHandlingOptions(store.snapshot());
+    });
     host.append(button);
   }
   const selected = $("selected-handling");
   selected.replaceChildren();
   if (!state.selectedHandling.length) {
-    const empty = document.createElement("p"); empty.className = "muted small"; empty.textContent = "No quick instructions selected."; selected.append(empty);
-  } else {
-    for (const instruction of state.selectedHandling) {
-      const chip = document.createElement("button"); chip.type = "button"; chip.className = "selected-handling-chip";
-      chip.textContent = `× ${instruction}`; chip.setAttribute("aria-label", `Remove ${instruction}`);
-      chip.addEventListener("click", () => { state.selectedHandling = state.selectedHandling.filter(v => v !== instruction); renderHandlingOptions(store.snapshot()); });
-      selected.append(chip);
-    }
+    const empty = document.createElement("p"); empty.className = "muted small"; empty.textContent = "No quick instructions selected."; selected.append(empty); return;
   }
-  updateHandlingCharacterCount();
-}
-function toggleHandlingInstruction(instruction) {
-  state.selectedHandling = state.selectedHandling.includes(instruction)
-    ? state.selectedHandling.filter(v => v !== instruction)
-    : [...state.selectedHandling, instruction];
-  renderHandlingOptions(store.snapshot());
-}
-async function deleteCustomHandlingInstruction(instruction) {
-  const ok = window.confirm(`Delete the saved quick instruction “${instruction}”?\n\nIt will be removed from the reusable buttons, but existing boxes that already use it will not be changed.`);
-  if (!ok) return;
-  try {
-    await store.deleteHandlingInstruction(instruction);
-    state.selectedHandling = state.selectedHandling.filter(v => v.toLowerCase() !== instruction.toLowerCase());
-    renderHandlingOptions(store.snapshot());
-    toast("Saved handling instruction deleted.");
-  } catch (error) {
-    toast(`Could not delete instruction: ${error.message || "Please try again."}`);
+  for (const instruction of state.selectedHandling) {
+    const chip = document.createElement("button"); chip.type = "button"; chip.className = "selected-handling-chip";
+    chip.textContent = `× ${instruction}`; chip.setAttribute("aria-label", `Remove ${instruction}`);
+    chip.addEventListener("click", () => { state.selectedHandling = state.selectedHandling.filter(v => v !== instruction); renderHandlingOptions(store.snapshot()); });
+    selected.append(chip);
   }
 }
-function updateHandlingCharacterCount() {
-  const counter = $("handling-character-count");
-  if (!counter) return;
-  const notes = ($("box-notes")?.value || "").split(/\r?\n/).map(v => v.trim()).filter(Boolean);
-  const text = [...new Set([...state.selectedHandling, ...notes])].join(" · ") || "NO SPECIAL HANDLING";
-  const count = text.length;
-  const max = 66; // Three printed lines at the current 22-character line-wrap target.
-  counter.textContent = `Label handling text: ${count}/${max} characters${count > max ? " — likely to be cut off on the printed label" : ""}`;
-  counter.classList.toggle("over-limit", count > max);
-}
-
 function renderRoomsAndLocations(s) {
   $("room-list").replaceChildren();
   for (const room of s.rooms) {
     const row = document.createElement("div"); row.className = "settings-row";
-    const count = s.boxes.filter(b => b.roomId === room.id).length;
-    row.innerHTML = `<span><strong>${escapeHtml(room.name)}</strong><small>Prefix: ${escapeHtml(room.prefix)} · ${count} box${count === 1 ? "" : "es"}</small></span><button class="button button-quiet room-delete-button" type="button" data-delete-room="${escapeHtml(room.id)}">Delete</button>`;
+    row.innerHTML = `<span><strong>${escapeHtml(room.name)}</strong><small>Prefix: ${escapeHtml(room.prefix)}</small></span>`;
     $("room-list").append(row);
   }
   $("location-list").replaceChildren();
@@ -320,7 +254,7 @@ $("box-form").addEventListener("submit", async event => {
     const isNew = !input.id;
     const box = await store.saveBox(input);
     render(); showView("inventory"); toast(`${box.boxId} saved.`);
-    if (isNew) { resetForm(); openLabel(box.id); }
+    if (isNew) openLabel(box.id);
     else openDetail(box.id);
   } catch (error) { setFieldError("form-error", error.message); }
 });
@@ -349,7 +283,6 @@ $("quick-add-location").addEventListener("click", async () => {
     toast(`Location ${location.name} added and selected.`);
   } catch (error) { setFieldError("quick-location-error", error.message); }
 });
-$("box-notes").addEventListener("input", updateHandlingCharacterCount);
 $("add-custom-instruction").addEventListener("click", async () => {
   setFieldError("handling-error", "");
   const value = $("custom-instruction-text").value.trim();
@@ -536,29 +469,15 @@ window.addEventListener("hashchange", () => {
     else toast("This box is not in the local inventory on this device.");
   }
 });
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service worker registration failed", err)));
-}
 store.subscribe(render);
 
 function setWorkspaceVisible(visible) {
   $("workspace").classList.toggle("hidden", !visible);
   $("auth-panel").classList.toggle("hidden", visible);
 }
-const passwordSetupForm = $("password-setup-form");
-let passwordSetupActive = new URLSearchParams(location.search).get("set-password") === "1";
 async function updateAuthScreen(user) {
   const householdSetup = $("household-setup"), invite = $("household-invite"), tools = $("signed-in-tools");
   $("auth-error").textContent = ""; $("auth-message").textContent = "";
-  if (passwordSetupActive) {
-    setWorkspaceVisible(false); householdSetup.classList.add("hidden"); invite.classList.add("hidden");
-    $("auth-form").classList.add("hidden"); passwordSetupForm.classList.remove("hidden");
-    tools.classList.add("hidden");
-    $("password-setup-title").textContent = user ? "Finish setting up your account" : "Set or reset your password";
-    $("password-setup-description").textContent = user ? "Choose a password before continuing to your household ledger." : "Open the password-reset email on this device, then choose a new password.";
-    return;
-  }
-  passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
   if (!user) {
     setWorkspaceVisible(false); householdSetup.classList.add("hidden"); invite.classList.add("hidden"); tools.classList.add("hidden");
     $("auth-email").disabled = false; $("auth-password").disabled = false; return;
@@ -579,73 +498,11 @@ $("auth-form").addEventListener("submit", async event => {
   try { const user = await signIn($("auth-email").value.trim(), $("auth-password").value); await updateAuthScreen(user); }
   catch (e) { $("auth-error").textContent = e.message; }
 });
-
-$("forgot-password").addEventListener("click", async () => {
+$("auth-signup").addEventListener("click", async () => {
   $("auth-error").textContent = ""; $("auth-message").textContent = "";
-  const email = $("auth-email").value.trim();
-  if (!email) { $("auth-error").textContent = "Enter your email address first."; return; }
-  try { await requestPasswordReset(email); $("auth-message").textContent = "If an account exists for that address, a password-reset email has been sent. Open it on this device to choose a password."; }
+  try { const result = await signUp($("auth-email").value.trim(), $("auth-password").value); if (result.session && result.user) await updateAuthScreen(result.user); else $("auth-message").textContent = "Account created if the email is accepted. Check your inbox for Supabase's confirmation email, then sign in here."; }
   catch (e) { $("auth-error").textContent = e.message; }
 });
-passwordSetupForm.addEventListener("submit", async event => {
-  event.preventDefault(); $("password-setup-error").textContent = ""; $("password-setup-message").textContent = "";
-  const password = $("new-password").value, confirm = $("confirm-password").value;
-  if (password.length < 8) { $("password-setup-error").textContent = "Use a password with at least 8 characters."; return; }
-  if (password !== confirm) { $("password-setup-error").textContent = "The passwords do not match."; return; }
-  try {
-    await setPassword(password);
-    passwordSetupActive = false;
-    history.replaceState({}, "", location.pathname);
-    $("new-password").value = ""; $("confirm-password").value = "";
-    passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
-    await updateAuthScreen(await currentUser());
-    toast("Password saved. Your account is ready.");
-  } catch (e) { $("password-setup-error").textContent = e.message || "Could not save password. Reopen the invitation or password-reset link and try again."; }
-});
-$("cancel-password-setup").addEventListener("click", async () => {
-  passwordSetupActive = false; history.replaceState({}, "", location.pathname);
-  passwordSetupForm.classList.add("hidden"); $("auth-form").classList.remove("hidden");
-  await updateAuthScreen(await currentUser());
-});
-
-$("ledger-switcher")?.addEventListener("change", async event => {
-  try {
-    await store.switchLedger(event.target.value);
-    state.detailBoxId = null; state.labelBoxId = null; state.selectedHandling = [];
-    resetForm(); render();
-    $("sync-status").textContent = `Connected to ${store.snapshot().inventoryName}`;
-    $("footer-status").textContent = `Shared inventory · ${store.snapshot().inventoryName}`;
-    toast(`Switched to ${store.snapshot().inventoryName}.`);
-  } catch (error) { toast(`Could not switch ledger: ${error.message}`); render(); }
-});
-
-$("new-ledger-form")?.addEventListener("submit", async event => {
-  event.preventDefault(); $("new-ledger-error").textContent = "";
-  try {
-    const name = $("new-ledger-name").value.trim();
-    if (!name) throw new Error("Enter a name for the new ledger.");
-    await store.createHousehold(name);
-    $("new-ledger-form").reset(); render(); resetForm();
-    $("sync-status").textContent = `Connected to ${store.snapshot().inventoryName}`;
-    $("footer-status").textContent = `Shared inventory · ${store.snapshot().inventoryName}`;
-    toast(`Created and switched to ${store.snapshot().inventoryName}.`);
-  } catch (error) { $("new-ledger-error").textContent = error.message || "Could not create ledger."; }
-});
-
-$("room-list")?.addEventListener("click", async event => {
-  const button = event.target.closest("[data-delete-room]");
-  if (!button) return;
-  const room = store.rooms().find(r => r.id === button.dataset.deleteRoom);
-  if (!room) return;
-  const count = store.boxes().filter(b => b.roomId === room.id).length;
-  const message = count
-    ? `${room.name} has ${count} box${count === 1 ? "" : "es"} assigned to it. Move those boxes to another room before deleting this room.`
-    : `Delete the room “${room.name}”? This cannot be undone.`;
-  if (count || !confirm(message)) { if (count) toast(message); return; }
-  try { await store.deleteRoom(room.id); render(); toast(`Room ${room.name} deleted.`); }
-  catch (error) { toast(`Could not delete room: ${error.message}`); }
-});
-
 $("create-household").addEventListener("click", async () => {
   $("auth-error").textContent = "";
   try { await store.createHousehold($("household-name").value.trim() || "Shack Out Back Household"); toast("Household inventory created."); await updateAuthScreen(await currentUser()); }
@@ -673,17 +530,6 @@ $("settings-invite-member")?.addEventListener("click", async () => {
     $("settings-invite-email").value = "";
     toast("Household member added.");
   } catch (e) { $("settings-error").textContent = e.message; }
-});
-$("send-app-invite")?.addEventListener("click", async () => {
-  $("app-invite-error").textContent = ""; $("app-invite-message").textContent = "";
-  try {
-    const email = $("app-invite-email").value.trim();
-    if (!email) throw new Error("Enter the invitee's email address.");
-    if (!store.user?.email || APP_ADMIN_EMAIL === "REPLACE_WITH_YOUR_ADMIN_EMAIL" || store.user.email.toLowerCase() !== APP_ADMIN_EMAIL.toLowerCase()) throw new Error("This account is not configured as the app administrator.");
-    await store.inviteAppUser(email);
-    $("app-invite-message").textContent = `Invitation sent to ${email}. They can create an account from the email link; this does not grant access to your ledger.`;
-    $("app-invite-email").value = "";
-  } catch (e) { $("app-invite-error").textContent = e.message || "Could not send invitation."; }
 });
 $("settings-signout")?.addEventListener("click", async () => { try { await signOut(); await updateAuthScreen(null); } catch(e) { $("settings-error").textContent = e.message; } });
 authChanges(user => { updateAuthScreen(user); });
