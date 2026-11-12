@@ -27,10 +27,29 @@ function escapeHtml(value) {
 function showView(name) {
   state.activeView = name;
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === `view-${name}`));
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
+  document.querySelectorAll(".drawer-link[data-view]").forEach(t => t.classList.toggle("active", t.dataset.view === name));
+  closeDrawer();
   if (name === "create") resetForm();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+function openDrawer() {
+  const drawer = $("navigation-drawer"), backdrop = $("drawer-backdrop");
+  drawer.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); drawer.inert = false;
+  backdrop.hidden = false; document.body.classList.add("drawer-open");
+  $("nav-toggle").setAttribute("aria-expanded", "true");
+  $("nav-toggle").setAttribute("aria-label", "Close navigation");
+  $("drawer-close").focus();
+}
+function closeDrawer() {
+  const drawer = $("navigation-drawer"), backdrop = $("drawer-backdrop");
+  if (!drawer) return;
+  drawer.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); drawer.inert = true;
+  backdrop.hidden = true; document.body.classList.remove("drawer-open");
+  $("nav-toggle")?.setAttribute("aria-expanded", "false");
+  $("nav-toggle")?.setAttribute("aria-label", "Open navigation");
+  $("nav-toggle")?.focus({ preventScroll: true });
+}
+
 function populateSelect(select, options, selectedId = null) {
   const previous = selectedId ?? select.value;
   select.replaceChildren();
@@ -388,24 +407,59 @@ $("relocate-form").addEventListener("submit", async event => {
     toast(`${result.box.boxId} relocated: ${result.previousLocation} → ${result.box.currentLocation}`);
   } catch (error) { setFieldError("relocate-error", error.message); }
 });
-$("menu-export").addEventListener("click", () => {
-  const choice = prompt("Type EXPORT to download a JSON backup, PRINT to print the inventory, or IMPORT to restore a JSON backup.");
-  if (!choice) return;
-  if (choice.toUpperCase() === "EXPORT") downloadJson(store.exportData());
-  else if (choice.toUpperCase() === "PRINT") {
-    const root = renderPrintableInventory(store.snapshot());
-    document.getElementById("print-root")?.remove(); document.body.append(root); window.print(); root.remove();
-  } else if (choice.toUpperCase() === "IMPORT") { $("import-error").textContent = ""; $("import-dialog").showModal(); }
+const toolsDialog = $("tools-dialog");
+function resetToolsDialog() {
+  $("tools-action").value = ""; $("tools-description").textContent = "Choose an action to see its details.";
+  $("tools-import-panel").classList.add("hidden"); $("tools-import-file").value = "";
+  $("tools-message").textContent = ""; $("tools-continue").disabled = true;
+}
+function openToolsDialog() { resetToolsDialog(); toolsDialog.showModal(); }
+$("menu-export").addEventListener("click", openToolsDialog);
+$("drawer-tools").addEventListener("click", () => { closeDrawer(); openToolsDialog(); });
+$("tools-close").addEventListener("click", () => toolsDialog.close());
+$("tools-cancel").addEventListener("click", () => toolsDialog.close());
+$("tools-action").addEventListener("change", () => {
+  const action = $("tools-action").value;
+  $("tools-message").textContent = "";
+  $("tools-import-panel").classList.toggle("hidden", action !== "import");
+  const descriptions = {
+    export: `Download a JSON backup of ${store.snapshot().inventoryName || "the current ledger"}. This does not change your inventory.`,
+    print: `Prepare a printable inventory for ${store.snapshot().inventoryName || "the current ledger"}.`,
+    import: "Choose a JSON backup to validate. Restoring into the shared cloud ledger is not enabled yet, so no records can be imported or overwritten."
+  };
+  $("tools-description").textContent = descriptions[action] || "Choose an action to see its details.";
+  $("tools-continue").disabled = !action;
+  $("tools-continue").textContent = action === "export" ? "Download Backup" : action === "print" ? "Prepare Printout" : action === "import" ? "Check File" : "Continue";
 });
-$("import-form").addEventListener("submit", async event => {
-  event.preventDefault(); setFieldError("import-error", "");
+$("tools-continue").addEventListener("click", async () => {
+  const action = $("tools-action").value;
+  $("tools-message").textContent = "";
   try {
-    const file = $("import-file").files[0]; if (!file) throw new Error("Choose a JSON file.");
-    const parsed = JSON.parse(await file.text());
-    if (!confirm("Cloud restore is not enabled in this first sync build. The file will NOT be imported. Continue to see the current restore status?")) return;
-    await store.importReplace(parsed);
-  } catch (error) { setFieldError("import-error", error.message); }
+    if (action === "export") {
+      const snapshot = store.snapshot();
+      if (!snapshot.inventoryId) throw new Error("Sign in and select a ledger before exporting.");
+      const safeName = (snapshot.inventoryName || "ledger").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "ledger";
+      downloadJson(store.exportData(), `shack-out-back-${safeName}-backup.json`);
+      $("tools-message").textContent = "Backup download started.";
+      toast("Ledger backup downloaded.");
+    } else if (action === "print") {
+      if (!store.snapshot().inventoryId) throw new Error("Sign in and select a ledger before printing.");
+      const root = renderPrintableInventory(store.snapshot());
+      document.getElementById("print-root")?.remove(); document.body.append(root);
+      toolsDialog.close(); window.print(); root.remove();
+    } else if (action === "import") {
+      const file = $("tools-import-file").files[0];
+      if (!file) throw new Error("Choose a JSON backup first.");
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || parsed.app !== "Shack Out Back" || !Array.isArray(parsed.boxes) || !Array.isArray(parsed.rooms) || !Array.isArray(parsed.locations)) throw new Error("This does not look like a valid Shack Out Back backup.");
+      $("tools-message").textContent = "The backup file is valid, but cloud restore is not enabled yet. Nothing was imported and your inventory was not changed.";
+    }
+  } catch (error) { $("tools-message").textContent = error.message || "That action could not be completed."; }
 });
+$("nav-toggle").addEventListener("click", openDrawer);
+$("drawer-close").addEventListener("click", closeDrawer);
+$("drawer-backdrop").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", event => { if (event.key === "Escape") closeDrawer(); });
 document.addEventListener("change", event => {
   if (event.target.matches("#box-room")) {
     const room = store.rooms().find(r => r.id === event.target.value);
@@ -659,7 +713,7 @@ $("copy-ledger-details")?.addEventListener("click", async () => {
   const s = store.snapshot();
   const details = `Shack Out Back ledger: ${s.inventoryName || "Household Inventory"}\nLedger ID: ${s.inventoryId || "—"}`;
   try { await navigator.clipboard.writeText(details); toast("Ledger name and ID copied."); }
-  catch { prompt("Copy these ledger details:", details); }
+  catch { toast("Clipboard access is unavailable in this browser. Open ledger details on a secure connection to copy them."); }
 });
 $("settings-invite-member")?.addEventListener("click", async () => {
   $("settings-error").textContent = ""; $("settings-invite-message").textContent = "";
