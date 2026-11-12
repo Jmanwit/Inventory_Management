@@ -265,4 +265,4 @@ site using an S23 Ultra and a tablet:
 
 This is a tested prototype baseline, not a production release. Save a
 GitHub repository ZIP and export the inventory JSON before beginning the
-next major change.
+next major change. We are getting closer every day! It's currently functional, and being used as designed, but we are fixing creature comforts constantly.
