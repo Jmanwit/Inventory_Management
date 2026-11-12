@@ -17,13 +17,33 @@
 </head>
 <body>
   <header class="topbar">
+    <button id="nav-toggle" class="menu-toggle" type="button" aria-label="Open navigation" aria-controls="navigation-drawer" aria-expanded="false"><span></span><span></span><span></span></button>
     <div class="brand-mark" aria-hidden="true">SOB</div>
     <div class="brand-copy">
       <p class="eyebrow">HOUSEHOLD INVENTORY</p>
       <h1>Shack Out Back</h1>
     </div>
-    <button id="menu-export" class="button button-quiet" type="button">Export</button>
+    <button id="menu-export" class="button button-quiet" type="button"><span aria-hidden="true">▤</span> Tools</button>
   </header>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="navigation-drawer" class="navigation-drawer" aria-label="Main navigation" aria-hidden="true" inert>
+    <div class="drawer-heading">
+      <div class="drawer-brand"><span class="drawer-brand-mark">SOB</span><div><strong>Shack Out Back</strong><small>HOUSEHOLD INVENTORY</small></div></div>
+      <button id="drawer-close" class="drawer-close" type="button" aria-label="Close navigation">×</button>
+    </div>
+    <p class="drawer-section-label">WORKSPACE</p>
+    <nav class="drawer-nav">
+      <button class="drawer-link active" data-view="inventory" type="button"><span class="drawer-icon">⌂</span>Inventory</button>
+      <button class="drawer-link" data-view="create" type="button"><span class="drawer-icon">＋</span>New Box</button>
+      <button class="drawer-link" data-view="rooms" type="button"><span class="drawer-icon">▦</span>Rooms & Locations</button>
+      <button class="drawer-link" data-view="settings" type="button"><span class="drawer-icon">⚙</span>Settings & Household</button>
+    </nav>
+    <div class="drawer-divider"></div>
+    <p class="drawer-section-label">TOOLS</p>
+    <button id="drawer-tools" class="drawer-link" type="button"><span class="drawer-icon">⇧</span>Backup & Print</button>
+    <div class="drawer-footer"><span class="drawer-footer-mark">SOB</span><span>Know what you own.<br>Know where it is.</span></div>
+  </aside>
 
   <main class="app-shell">
     <section id="auth-panel" class="auth-panel form-card">
@@ -75,13 +95,6 @@
       <select id="ledger-switcher" aria-label="Switch inventory ledger"></select>
       <p class="help-text">Choose which inventory you are working in. Your ledgers and their records remain separate.</p>
     </section>
-
-    <nav class="tabs" aria-label="Main navigation">
-      <button class="tab active" data-view="inventory" type="button">Inventory</button>
-      <button class="tab" data-view="create" type="button">New Box</button>
-      <button class="tab" data-view="rooms" type="button">Rooms & Locations</button>
-      <button class="tab" data-view="settings" type="button">Settings & Household</button>
-    </nav>
 
     <section id="view-inventory" class="view active" aria-labelledby="inventory-title">
       <div class="section-heading">
@@ -317,18 +330,30 @@
     </div>
   </dialog>
 
-  <dialog id="import-dialog" class="small-dialog">
-    <form id="import-form" method="dialog">
-      <p class="eyebrow">RESTORE DATA</p>
-      <h2>Import inventory</h2>
-      <p class="muted">JSON export works for cloud inventory. Restoring a JSON backup into the shared database is intentionally disabled until the first two-account sync is tested, to avoid accidental duplicates or overwrites.</p>
-      <label>Choose JSON backup<input id="import-file" type="file" accept="application/json,.json" required></label>
-      <div class="form-actions">
-        <button class="button button-secondary" type="button" data-close-dialog="import-dialog">Cancel</button>
-        <button class="button button-primary" type="submit">Import JSON</button>
+  <dialog id="tools-dialog" class="tools-dialog">
+    <div class="tools-dialog-head">
+      <div class="tools-brand"><span class="tools-brand-mark">SOB</span><div><p class="eyebrow">SHACK OUT BACK</p><h2>Inventory Tools</h2></div></div>
+      <button class="icon-button" id="tools-close" type="button" aria-label="Close inventory tools">×</button>
+    </div>
+    <div class="tools-dialog-body">
+      <label for="tools-action">What would you like to do?</label>
+      <select id="tools-action">
+        <option value="" selected>Choose an action…</option>
+        <option value="export">Export JSON backup</option>
+        <option value="print">Print inventory</option>
+        <option value="import">Import JSON backup</option>
+      </select>
+      <p id="tools-description" class="help-text" aria-live="polite">Choose an action to see its details.</p>
+      <div id="tools-import-panel" class="tools-import-panel hidden">
+        <label for="tools-import-file">Select a JSON backup<input id="tools-import-file" type="file" accept="application/json,.json"></label>
+        <p class="tools-warning">Cloud restore is not enabled yet. The file can be checked, but it cannot be imported into your shared ledger. No inventory data will be changed.</p>
       </div>
-      <p id="import-error" class="error-message" role="alert"></p>
-    </form>
+      <p id="tools-message" class="tools-message" role="status" aria-live="polite"></p>
+      <div class="form-actions tools-actions">
+        <button class="button button-secondary" id="tools-cancel" type="button">Cancel</button>
+        <button class="button button-primary" id="tools-continue" type="button" disabled>Continue</button>
+      </div>
+    </div>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
