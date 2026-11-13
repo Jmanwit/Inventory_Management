@@ -307,3 +307,13 @@ body.drawer-open { overflow:hidden; }
 .tools-message:empty { display:none; }
 .tools-actions { margin-top:22px; }
 @media (max-width:520px) { .tools-dialog-body { padding:17px; } .tools-dialog-head { padding:15px 17px; } }
+
+
+/* Inline quick-edit controls in the box detail dialog */
+.quick-edit-card label { display:block; color:var(--brown-muted); font-size:.76rem; margin-bottom:7px; }
+.detail-quick-select { width:100%; min-width:0; border:1px solid var(--line); border-radius:8px; padding:9px 30px 9px 10px; color:var(--walnut); background:#fffdf8; font:inherit; font-weight:600; font-size:.98rem; }
+.detail-quick-select:disabled { opacity:.6; }
+.quick-add-link { display:inline-block; margin-top:8px; padding:2px 0; border:0; background:transparent; color:var(--green); font:inherit; font-weight:600; font-size:.82rem; text-align:left; text-decoration:underline; cursor:pointer; }
+.detail-location-add { display:flex; gap:7px; margin-top:8px; align-items:center; }
+.detail-location-add input { min-width:0; width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; background:#fffdf8; color:var(--walnut); }
+.detail-location-add .button { flex-shrink:0; padding:8px 12px; min-height:38px; }
