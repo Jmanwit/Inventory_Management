@@ -222,19 +222,21 @@ function editBox(box) {
   renderHandlingOptions(store.snapshot());
   $("cancel-edit").classList.remove("hidden");
 }
-function openDetail(id) {
+function renderDetail(id) {
   const box = store.getBox(id); if (!box) return;
-  state.detailBoxId = id;
-  const dialog = $("detail-dialog");
+  const snapshot = store.snapshot();
+  const locationOptions = snapshot.locations.map(location => `<option value="${escapeHtml(location.id)}" ${location.id === box.locationId ? "selected" : ""}>${escapeHtml(location.name)}</option>`).join("");
+  const statusOptions = ["Packed", "In progress", "Unpacked"].map(status => `<option value="${status}" ${status === box.status ? "selected" : ""}>${status}</option>`).join("");
   $("detail-content").innerHTML = `
     <div class="dialog-inner">
       <div class="dialog-head"><div><p class="eyebrow">${escapeHtml(box.boxId)}</p><h2>${escapeHtml(box.description)}</h2><p class="muted">Destination: ${escapeHtml(box.destination)}</p></div><button class="icon-button" data-close-dialog="detail-dialog" type="button" aria-label="Close">×</button></div>
       <div class="detail-meta">
         <div class="meta-card"><span>DESTINATION</span><strong>${escapeHtml(box.destination)}</strong></div>
-        <div class="meta-card"><span>CURRENT LOCATION</span><strong>${escapeHtml(box.currentLocation)}</strong></div>
-        <div class="meta-card"><span>STATUS</span><strong>${escapeHtml(box.status)}</strong></div>
+        <div class="meta-card quick-edit-card"><label for="detail-location-select">CURRENT LOCATION</label><select id="detail-location-select" class="detail-quick-select" data-quick-field="location" ${snapshot.locations.length ? "" : "disabled"}>${locationOptions}</select><button class="quick-add-link" data-show-location-add type="button">+ Add a location</button><div id="detail-location-add" class="detail-location-add hidden"><input id="detail-new-location" maxlength="60" placeholder="New physical location"><button class="button button-secondary" data-create-detail-location type="button">Add</button></div></div>
+        <div class="meta-card quick-edit-card"><label for="detail-status-select">PACKING STATUS</label><select id="detail-status-select" class="detail-quick-select" data-quick-field="status">${statusOptions}</select></div>
         <div class="meta-card"><span>LAST UPDATED</span><strong>${new Date(box.updatedAt).toLocaleString()}</strong></div>
       </div>
+      <p id="detail-quick-status" class="help-text" role="status" aria-live="polite"></p>
       <div class="detail-section"><h3>Contents (${box.items.length})</h3>${box.items.length ? `<ul class="item-list">${box.items.map(i=>`<li>${escapeHtml(i)}</li>`).join("")}</ul>` : '<p class="muted">No individual contents recorded.</p>'}</div>
       <div class="detail-section"><h3>Handling instructions</h3>${(box.handlingInstructions || []).length ? `<p class="detail-handling-tags">${box.handlingInstructions.map(i=>`<span>${escapeHtml(i)}</span>`).join("")}</p>` : ""}<p>${escapeHtml(box.notes || "No additional notes.")}</p></div>
       <div class="detail-actions">
@@ -245,7 +247,33 @@ function openDetail(id) {
       </div>
       <p class="help-text">QR code identifies this box by its stable record ID. Scanning opens this record on this device when it exists in local inventory.</p>
     </div>`;
-  dialog.showModal();
+}
+function openDetail(id) {
+  if (!store.getBox(id)) return;
+  state.detailBoxId = id;
+  renderDetail(id);
+  $("detail-dialog").showModal();
+}
+async function saveDetailQuickField(field, value, control) {
+  const id = state.detailBoxId;
+  const status = $("detail-quick-status");
+  const previousBox = store.getBox(id);
+  if (!previousBox) return;
+  const previousValue = field === "location" ? previousBox.locationId : previousBox.status;
+  control.disabled = true;
+  status.textContent = "Saving…";
+  try {
+    const changes = field === "location" ? { locationId: value } : { status: value };
+    await store.updateQuickFields(id, changes);
+    render();
+    renderDetail(id);
+    $("detail-quick-status").textContent = "Saved.";
+    toast(field === "location" ? "Box location updated." : "Packing status updated.");
+  } catch (error) {
+    control.value = previousValue;
+    control.disabled = false;
+    status.textContent = `Couldn't save: ${error.message}`;
+  }
 }
 function openRelocate(id) {
   const box = store.getBox(id); if (!box) return;
@@ -262,9 +290,42 @@ function openLabel(id) {
   state.labelBoxId = id; printer.show(box); labelDialog.showModal();
 }
 function setFieldError(id, message) { $(id).textContent = message; }
+document.addEventListener("change", async event => {
+  const control = event.target.closest("[data-quick-field]");
+  if (!control) return;
+  await saveDetailQuickField(control.dataset.quickField, control.value, control);
+});
+document.addEventListener("change", async event => {
+  const control = event.target.closest("[data-quick-field]");
+  if (!control) return;
+  await saveDetailQuickField(control.dataset.quickField, control.value, control);
+});
 document.addEventListener("click", async event => {
   const target = event.target.closest("button");
   if (!target) return;
+  if (target.hasAttribute("data-show-location-add")) {
+    $("detail-location-add").classList.toggle("hidden");
+    $("detail-new-location").focus();
+    return;
+  }
+  if (target.hasAttribute("data-create-detail-location")) {
+    const input = $("detail-new-location");
+    const name = input.value.trim();
+    const message = $("detail-quick-status");
+    if (!name) { message.textContent = "Enter a location name."; return; }
+    target.disabled = true;
+    try {
+      const location = await store.addLocation(name);
+      const box = await store.updateQuickFields(state.detailBoxId, { locationId: location.id });
+      render(); renderDetail(box.id);
+      $("detail-quick-status").textContent = "New location created and assigned.";
+      toast(`Location changed to ${location.name}.`);
+    } catch (error) {
+      message.textContent = `Couldn't add location: ${error.message}`;
+      target.disabled = false;
+    }
+    return;
+  }
   if (target.dataset.view) showView(target.dataset.view);
   if (target.dataset.action === "new-box") showView("create");
   if (target.dataset.closeDialog) $(target.dataset.closeDialog).close();
